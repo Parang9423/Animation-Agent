@@ -4,6 +4,7 @@ import { CharacterDetailPanel } from './components/characters/CharacterDetailPan
 import { FactionCard } from './components/factions/FactionCard'
 import { LocationCard } from './components/locations/LocationCard'
 import { ProjectCard } from './components/projects/ProjectCard'
+import { PromptBuilderPanel } from './components/promptBuilder/PromptBuilderPanel'
 import { PromptTemplateCard } from './components/promptTemplates/PromptTemplateCard'
 import { RelationshipCard } from './components/relationships/RelationshipCard'
 import { WorldviewCard } from './components/worldviews/WorldviewCard'
@@ -209,6 +210,13 @@ function App() {
         />
       )}
 
+      {activeSection === 'promptBuilder' && (
+        <PromptBuilderPanel
+          characters={characters}
+          promptTemplates={promptTemplates}
+        />
+      )}
+
       {activeSection === 'promptTemplates' && (
         <PromptTemplatesSection
           promptTemplates={promptTemplates}
@@ -232,6 +240,7 @@ function PageIntro({ activeSection }: PageIntroProps) {
     locations: 'Locations',
     factions: 'Factions',
     relationships: 'Relationships',
+    promptBuilder: 'Prompt Builder',
     promptTemplates: 'Prompt Templates',
   }
 
@@ -248,6 +257,8 @@ function PageIntro({ activeSection }: PageIntroProps) {
       'Eternal Rift 세력, 조직, 문명 정보를 확인합니다.',
     relationships:
       'Eternal Rift 캐릭터 간 관계, 감정선, 갈등 구조를 확인합니다.',
+    promptBuilder:
+      '캐릭터 데이터와 프롬프트 템플릿을 조합해 Google Flow용 최종 프롬프트를 생성합니다.',
     promptTemplates:
       'Google Flow용 프롬프트 템플릿과 변수를 확인합니다.',
   }
