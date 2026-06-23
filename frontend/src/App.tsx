@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CharacterCard } from './components/characters/CharacterCard'
 import { CharacterDetailPanel } from './components/characters/CharacterDetailPanel'
+import { FactionCard } from './components/factions/FactionCard'
 import { LocationCard } from './components/locations/LocationCard'
 import { ProjectCard } from './components/projects/ProjectCard'
 import { WorldviewCard } from './components/worldviews/WorldviewCard'
@@ -11,6 +12,10 @@ import {
   getCharactersByProject,
   type CharacterWithWorldview,
 } from './services/characterService'
+import {
+  getFactionsByProject,
+  type FactionWithWorldview,
+} from './services/factionService'
 import {
   getLocationsByProject,
   type LocationWithWorldview,
@@ -29,6 +34,7 @@ function App() {
   const [characters, setCharacters] = useState<CharacterWithWorldview[]>([])
   const [worldviews, setWorldviews] = useState<Worldview[]>([])
   const [locations, setLocations] = useState<LocationWithWorldview[]>([])
+  const [factions, setFactions] = useState<FactionWithWorldview[]>([])
   const [selectedCharacter, setSelectedCharacter] =
     useState<CharacterWithWorldview | null>(null)
 
@@ -36,6 +42,7 @@ function App() {
   const [isLoadingCharacters, setIsLoadingCharacters] = useState(true)
   const [isLoadingWorldviews, setIsLoadingWorldviews] = useState(true)
   const [isLoadingLocations, setIsLoadingLocations] = useState(true)
+  const [isLoadingFactions, setIsLoadingFactions] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   useEffect(() => {
@@ -83,6 +90,17 @@ function App() {
       .finally(() => {
         setIsLoadingLocations(false)
       })
+
+    getFactionsByProject(ETERNAL_RIFT_PROJECT_ID)
+      .then((data) => {
+        setFactions(data)
+      })
+      .catch((error) => {
+        setErrorMessage(error.message)
+      })
+      .finally(() => {
+        setIsLoadingFactions(false)
+      })
   }, [])
 
   return (
@@ -105,6 +123,7 @@ function App() {
           characters={characters}
           worldviews={worldviews}
           locations={locations}
+          factions={factions}
           isLoadingProjects={isLoadingProjects}
           errorMessage={errorMessage}
         />
@@ -136,10 +155,19 @@ function App() {
         />
       )}
 
+      {activeSection === 'factions' && (
+        <FactionsSection
+          factions={factions}
+          isLoadingFactions={isLoadingFactions}
+          errorMessage={errorMessage}
+        />
+      )}
+
       {activeSection !== 'overview' &&
         activeSection !== 'characters' &&
         activeSection !== 'worldviews' &&
-        activeSection !== 'locations' && (
+        activeSection !== 'locations' &&
+        activeSection !== 'factions' && (
           <ComingSoonSection activeSection={activeSection} />
         )}
     </AppLayout>
@@ -170,7 +198,8 @@ function PageIntro({ activeSection }: PageIntroProps) {
       'Eternal Rift 세계관 규칙, 문명 수준, 시각 톤, 프롬프트 요약을 확인합니다.',
     locations:
       'Eternal Rift 장소와 배경 프롬프트 데이터를 확인합니다.',
-    factions: '세력, 조직, 문명 정보를 관리하는 화면이 추가될 예정입니다.',
+    factions:
+      'Eternal Rift 세력, 조직, 문명 정보를 확인합니다.',
     relationships: '캐릭터 간 관계와 갈등 구조를 관리하는 화면이 추가될 예정입니다.',
     promptTemplates: 'Google Flow용 프롬프트 템플릿을 관리하는 화면이 추가될 예정입니다.',
   }
@@ -197,6 +226,7 @@ type OverviewSectionProps = {
   characters: CharacterWithWorldview[]
   worldviews: Worldview[]
   locations: LocationWithWorldview[]
+  factions: FactionWithWorldview[]
   isLoadingProjects: boolean
   errorMessage: string | null
 }
@@ -206,16 +236,18 @@ function OverviewSection({
   characters,
   worldviews,
   locations,
+  factions,
   isLoadingProjects,
   errorMessage,
 }: OverviewSectionProps) {
   return (
     <>
-      <section className="mt-8 grid gap-4 md:grid-cols-5">
+      <section className="mt-8 grid gap-4 md:grid-cols-6">
         <SummaryCard label="Projects" value={projects.length} />
         <SummaryCard label="Characters" value={characters.length} />
         <SummaryCard label="Worldviews" value={worldviews.length} />
         <SummaryCard label="Locations" value={locations.length} />
+        <SummaryCard label="Factions" value={factions.length} />
         <SummaryCard label="Current MVP" value="Read UI" />
       </section>
 
@@ -397,6 +429,51 @@ function LocationsSection({
   )
 }
 
+type FactionsSectionProps = {
+  factions: FactionWithWorldview[]
+  isLoadingFactions: boolean
+  errorMessage: string | null
+}
+
+function FactionsSection({
+  factions,
+  isLoadingFactions,
+  errorMessage,
+}: FactionsSectionProps) {
+  return (
+    <section className="mt-8">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold">Factions</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Eternal Rift 세력과 문명 목록
+          </p>
+        </div>
+
+        <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-sm text-slate-300">
+          {factions.length} factions
+        </span>
+      </div>
+
+      {isLoadingFactions && (
+        <p className="text-slate-400">Loading factions...</p>
+      )}
+
+      {!isLoadingFactions && !errorMessage && factions.length === 0 && (
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-5 text-slate-300">
+          조회된 세력이 없습니다.
+        </div>
+      )}
+
+      <div className="grid gap-5">
+        {factions.map((faction) => (
+          <FactionCard key={faction.id} faction={faction} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
 type SummaryCardProps = {
   label: string
   value: number | string
@@ -414,16 +491,18 @@ function SummaryCard({ label, value }: SummaryCardProps) {
 type ComingSoonSectionProps = {
   activeSection: Exclude<
     AppSection,
-    'overview' | 'characters' | 'worldviews' | 'locations'
+    'overview' | 'characters' | 'worldviews' | 'locations' | 'factions'
   >
 }
 
 function ComingSoonSection({ activeSection }: ComingSoonSectionProps) {
   const labelMap: Record<
-    Exclude<AppSection, 'overview' | 'characters' | 'worldviews' | 'locations'>,
+    Exclude<
+      AppSection,
+      'overview' | 'characters' | 'worldviews' | 'locations' | 'factions'
+    >,
     string
   > = {
-    factions: 'Factions',
     relationships: 'Relationships',
     promptTemplates: 'Prompt Templates',
   }
