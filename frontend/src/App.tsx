@@ -4,6 +4,7 @@ import { CharacterDetailPanel } from './components/characters/CharacterDetailPan
 import { FactionCard } from './components/factions/FactionCard'
 import { LocationCard } from './components/locations/LocationCard'
 import { ProjectCard } from './components/projects/ProjectCard'
+import { PromptTemplateCard } from './components/promptTemplates/PromptTemplateCard'
 import { RelationshipCard } from './components/relationships/RelationshipCard'
 import { WorldviewCard } from './components/worldviews/WorldviewCard'
 import { AppLayout } from './layouts/AppLayout'
@@ -21,6 +22,10 @@ import {
   getLocationsByProject,
   type LocationWithWorldview,
 } from './services/locationService'
+import {
+  getPromptTemplatesByProject,
+  type PromptTemplate,
+} from './services/promptTemplateService'
 import {
   getRelationshipsByProject,
   type RelationshipWithCharacters,
@@ -41,6 +46,7 @@ function App() {
   const [locations, setLocations] = useState<LocationWithWorldview[]>([])
   const [factions, setFactions] = useState<FactionWithWorldview[]>([])
   const [relationships, setRelationships] = useState<RelationshipWithCharacters[]>([])
+  const [promptTemplates, setPromptTemplates] = useState<PromptTemplate[]>([])
   const [selectedCharacter, setSelectedCharacter] =
     useState<CharacterWithWorldview | null>(null)
 
@@ -50,6 +56,7 @@ function App() {
   const [isLoadingLocations, setIsLoadingLocations] = useState(true)
   const [isLoadingFactions, setIsLoadingFactions] = useState(true)
   const [isLoadingRelationships, setIsLoadingRelationships] = useState(true)
+  const [isLoadingPromptTemplates, setIsLoadingPromptTemplates] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   useEffect(() => {
@@ -119,6 +126,17 @@ function App() {
       .finally(() => {
         setIsLoadingRelationships(false)
       })
+
+    getPromptTemplatesByProject(ETERNAL_RIFT_PROJECT_ID)
+      .then((data) => {
+        setPromptTemplates(data)
+      })
+      .catch((error) => {
+        setErrorMessage(error.message)
+      })
+      .finally(() => {
+        setIsLoadingPromptTemplates(false)
+      })
   }, [])
 
   return (
@@ -143,6 +161,7 @@ function App() {
           locations={locations}
           factions={factions}
           relationships={relationships}
+          promptTemplates={promptTemplates}
           isLoadingProjects={isLoadingProjects}
           errorMessage={errorMessage}
         />
@@ -190,14 +209,13 @@ function App() {
         />
       )}
 
-      {activeSection !== 'overview' &&
-        activeSection !== 'characters' &&
-        activeSection !== 'worldviews' &&
-        activeSection !== 'locations' &&
-        activeSection !== 'factions' &&
-        activeSection !== 'relationships' && (
-          <ComingSoonSection activeSection={activeSection} />
-        )}
+      {activeSection === 'promptTemplates' && (
+        <PromptTemplatesSection
+          promptTemplates={promptTemplates}
+          isLoadingPromptTemplates={isLoadingPromptTemplates}
+          errorMessage={errorMessage}
+        />
+      )}
     </AppLayout>
   )
 }
@@ -230,7 +248,8 @@ function PageIntro({ activeSection }: PageIntroProps) {
       'Eternal Rift 세력, 조직, 문명 정보를 확인합니다.',
     relationships:
       'Eternal Rift 캐릭터 간 관계, 감정선, 갈등 구조를 확인합니다.',
-    promptTemplates: 'Google Flow용 프롬프트 템플릿을 관리하는 화면이 추가될 예정입니다.',
+    promptTemplates:
+      'Google Flow용 프롬프트 템플릿과 변수를 확인합니다.',
   }
 
   return (
@@ -257,6 +276,7 @@ type OverviewSectionProps = {
   locations: LocationWithWorldview[]
   factions: FactionWithWorldview[]
   relationships: RelationshipWithCharacters[]
+  promptTemplates: PromptTemplate[]
   isLoadingProjects: boolean
   errorMessage: string | null
 }
@@ -268,18 +288,20 @@ function OverviewSection({
   locations,
   factions,
   relationships,
+  promptTemplates,
   isLoadingProjects,
   errorMessage,
 }: OverviewSectionProps) {
   return (
     <>
-      <section className="mt-8 grid gap-4 md:grid-cols-7">
+      <section className="mt-8 grid gap-4 md:grid-cols-4 xl:grid-cols-8">
         <SummaryCard label="Projects" value={projects.length} />
         <SummaryCard label="Characters" value={characters.length} />
         <SummaryCard label="Worldviews" value={worldviews.length} />
         <SummaryCard label="Locations" value={locations.length} />
         <SummaryCard label="Factions" value={factions.length} />
         <SummaryCard label="Relations" value={relationships.length} />
+        <SummaryCard label="Templates" value={promptTemplates.length} />
         <SummaryCard label="Current MVP" value="Read UI" />
       </section>
 
@@ -554,6 +576,54 @@ function RelationshipsSection({
   )
 }
 
+type PromptTemplatesSectionProps = {
+  promptTemplates: PromptTemplate[]
+  isLoadingPromptTemplates: boolean
+  errorMessage: string | null
+}
+
+function PromptTemplatesSection({
+  promptTemplates,
+  isLoadingPromptTemplates,
+  errorMessage,
+}: PromptTemplatesSectionProps) {
+  return (
+    <section className="mt-8">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold">Prompt Templates</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Google Flow용 프롬프트 템플릿 목록
+          </p>
+        </div>
+
+        <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-sm text-slate-300">
+          {promptTemplates.length} templates
+        </span>
+      </div>
+
+      {isLoadingPromptTemplates && (
+        <p className="text-slate-400">Loading prompt templates...</p>
+      )}
+
+      {!isLoadingPromptTemplates && !errorMessage && promptTemplates.length === 0 && (
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-5 text-slate-300">
+          조회된 프롬프트 템플릿이 없습니다.
+        </div>
+      )}
+
+      <div className="grid gap-5">
+        {promptTemplates.map((promptTemplate) => (
+          <PromptTemplateCard
+            key={promptTemplate.id}
+            promptTemplate={promptTemplate}
+          />
+        ))}
+      </div>
+    </section>
+  )
+}
+
 type SummaryCardProps = {
   label: string
   value: number | string
@@ -565,47 +635,6 @@ function SummaryCard({ label, value }: SummaryCardProps) {
       <p className="text-sm uppercase tracking-wide text-slate-500">{label}</p>
       <p className="mt-3 text-3xl font-bold text-slate-100">{value}</p>
     </div>
-  )
-}
-
-type ComingSoonSectionProps = {
-  activeSection: Exclude<
-    AppSection,
-    | 'overview'
-    | 'characters'
-    | 'worldviews'
-    | 'locations'
-    | 'factions'
-    | 'relationships'
-  >
-}
-
-function ComingSoonSection({ activeSection }: ComingSoonSectionProps) {
-  const labelMap: Record<
-    Exclude<
-      AppSection,
-      | 'overview'
-      | 'characters'
-      | 'worldviews'
-      | 'locations'
-      | 'factions'
-      | 'relationships'
-    >,
-    string
-  > = {
-    promptTemplates: 'Prompt Templates',
-  }
-
-  return (
-    <section className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-8">
-      <p className="text-sm font-medium uppercase tracking-[0.3em] text-cyan-400">
-        Coming Soon
-      </p>
-      <h2 className="mt-3 text-3xl font-bold">{labelMap[activeSection]}</h2>
-      <p className="mt-3 leading-7 text-slate-400">
-        이 섹션은 다음 Sprint에서 Supabase 조회 화면으로 확장할 예정입니다.
-      </p>
-    </section>
   )
 }
 
