@@ -5,6 +5,7 @@ export type AppSection =
   | 'locations'
   | 'factions'
   | 'relationships'
+  | 'promptBuilder'
   | 'promptTemplates'
 
 type SidebarProps = {
@@ -50,6 +51,11 @@ const navItems: NavItem[] = [
     description: 'Character links',
   },
   {
+    id: 'promptBuilder',
+    label: 'Prompt Builder',
+    description: 'Generate final prompts',
+  },
+  {
     id: 'promptTemplates',
     label: 'Prompt Templates',
     description: 'Google Flow prompts',
@@ -71,7 +77,7 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
         </p>
       </div>
 
-      <nav className="mt-8 flex flex-1 flex-col gap-2">
+      <nav className="mt-8 flex flex-1 flex-col gap-2 overflow-y-auto pr-1">
         {navItems.map((item) => {
           const isActive = activeSection === item.id
 
@@ -95,7 +101,7 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
         })}
       </nav>
 
-      <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
+      <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-900 p-4">
         <p className="text-xs uppercase tracking-wide text-slate-500">
           Current Project
         </p>
