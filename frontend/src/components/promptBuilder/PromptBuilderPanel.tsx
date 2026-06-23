@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CharacterWithWorldview } from '../../services/characterService'
 import type { PromptTemplate } from '../../services/promptTemplateService'
-
-const DEFAULT_STYLE_PROMPT_PREFIX =
-  'cinematic anime dark fantasy, highly detailed anime key visual, dramatic lighting, cold blue atmosphere, Google Flow-ready composition'
+import type { StyleGuide } from '../../services/styleGuideService'
 
 type PromptBuilderPanelProps = {
   characters: CharacterWithWorldview[]
   promptTemplates: PromptTemplate[]
+  styleGuides: StyleGuide[]
 }
 
 export function PromptBuilderPanel({
   characters,
   promptTemplates,
+  styleGuides,
 }: PromptBuilderPanelProps) {
   const characterTemplates = useMemo(
     () => promptTemplates.filter((template) => template.template_type === 'character'),
@@ -21,6 +21,7 @@ export function PromptBuilderPanel({
 
   const [selectedCharacterId, setSelectedCharacterId] = useState('')
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
+  const [selectedStyleGuideId, setSelectedStyleGuideId] = useState('')
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>(
     'idle',
   )
@@ -37,11 +38,23 @@ export function PromptBuilderPanel({
     }
   }, [characterTemplates, selectedTemplateId])
 
+  useEffect(() => {
+    if (!selectedStyleGuideId && styleGuides.length > 0) {
+      const defaultStyleGuide =
+        styleGuides.find((styleGuide) => styleGuide.is_default) ?? styleGuides[0]
+
+      setSelectedStyleGuideId(defaultStyleGuide.id)
+    }
+  }, [selectedStyleGuideId, styleGuides])
+
   const selectedCharacter =
     characters.find((character) => character.id === selectedCharacterId) ?? null
 
   const selectedTemplate =
     characterTemplates.find((template) => template.id === selectedTemplateId) ?? null
+
+  const selectedStyleGuide =
+    styleGuides.find((styleGuide) => styleGuide.id === selectedStyleGuideId) ?? null
 
   const generatedPrompt = useMemo(() => {
     if (!selectedCharacter || !selectedTemplate?.template_body) {
@@ -51,9 +64,19 @@ export function PromptBuilderPanel({
     return buildCharacterPrompt(
       selectedTemplate.template_body,
       selectedCharacter,
-      DEFAULT_STYLE_PROMPT_PREFIX,
+      selectedStyleGuide,
     )
-  }, [selectedCharacter, selectedTemplate])
+  }, [selectedCharacter, selectedStyleGuide, selectedTemplate])
+
+  const unresolvedVariables = useMemo(() => {
+    return Array.from(
+      new Set(
+        generatedPrompt.match(/{{\s*[\w.]+\s*}}/g)?.map((variable) =>
+          variable.replace(/[{}\s]/g, ''),
+        ) ?? [],
+      ),
+    )
+  }, [generatedPrompt])
 
   const handleCopy = async () => {
     if (!generatedPrompt) {
@@ -76,7 +99,7 @@ export function PromptBuilderPanel({
         <div>
           <h2 className="text-2xl font-semibold">Prompt Builder</h2>
           <p className="mt-1 text-sm text-slate-500">
-            캐릭터 데이터와 Google Flow Character 템플릿을 조합해 최종 프롬프트를 생성합니다.
+            캐릭터 데이터, 스타일 가이드, Google Flow Character 템플릿을 조합해 최종 프롬프트를 생성합니다.
           </p>
         </div>
 
@@ -114,6 +137,22 @@ export function PromptBuilderPanel({
           </label>
 
           <label className="mt-5 block">
+            <span className="text-sm text-slate-400">Style Guide</span>
+            <select
+              value={selectedStyleGuideId}
+              onChange={(event) => setSelectedStyleGuideId(event.target.value)}
+              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
+            >
+              {styleGuides.map((styleGuide) => (
+                <option key={styleGuide.id} value={styleGuide.id}>
+                  {styleGuide.name}
+                  {styleGuide.is_default ? ' (default)' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="mt-5 block">
             <span className="text-sm text-slate-400">Prompt Template</span>
             <select
               value={selectedTemplateId}
@@ -133,7 +172,22 @@ export function PromptBuilderPanel({
               Style Prompt Prefix
             </p>
             <p className="mt-3 text-sm leading-6 text-slate-400">
-              {DEFAULT_STYLE_PROMPT_PREFIX}
+              {selectedStyleGuide?.prompt_prefix ?? 'No style prompt prefix'}
+            </p>
+          </div>
+
+          <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4">
+            <p className="text-sm font-semibold text-slate-300">
+              Style Details
+            </p>
+            <p className="mt-3 text-sm leading-6 text-slate-400">
+              Animation: {selectedStyleGuide?.animation_style ?? 'No animation style'}
+            </p>
+            <p className="mt-1 text-sm leading-6 text-slate-400">
+              Lighting: {selectedStyleGuide?.lighting_style ?? 'No lighting style'}
+            </p>
+            <p className="mt-1 text-sm leading-6 text-slate-400">
+              Mood: {selectedStyleGuide?.mood ?? 'No mood'}
             </p>
           </div>
 
@@ -143,6 +197,9 @@ export function PromptBuilderPanel({
             </p>
             <p className="mt-3 text-sm leading-6 text-slate-400">
               Character: {selectedCharacter?.name ?? 'No character'}
+            </p>
+            <p className="mt-1 text-sm leading-6 text-slate-400">
+              Style: {selectedStyleGuide?.name ?? 'No style guide'}
             </p>
             <p className="mt-1 text-sm leading-6 text-slate-400">
               Template: {selectedTemplate?.name ?? 'No template'}
@@ -175,8 +232,27 @@ export function PromptBuilderPanel({
             </button>
           </div>
 
+          {unresolvedVariables.length > 0 && (
+            <div className="mt-5 rounded-xl border border-yellow-700 bg-yellow-950/30 p-4 text-yellow-100">
+              <p className="text-sm font-semibold">Unresolved Variables</p>
+              <p className="mt-2 text-sm text-yellow-200/80">
+                아래 변수는 현재 Builder에서 치환되지 않았습니다.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {unresolvedVariables.map((variable) => (
+                  <span
+                    key={variable}
+                    className="rounded-full border border-yellow-700 bg-yellow-950 px-3 py-1 text-sm"
+                  >
+                    {variable}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           <pre className="mt-5 min-h-[520px] whitespace-pre-wrap break-words rounded-xl border border-cyan-900 bg-cyan-950/20 p-5 text-sm leading-7 text-slate-300">
-            {generatedPrompt || '프롬프트를 생성하려면 캐릭터와 템플릿 데이터가 필요합니다.'}
+            {generatedPrompt || '프롬프트를 생성하려면 캐릭터, 스타일, 템플릿 데이터가 필요합니다.'}
           </pre>
         </div>
       </div>
@@ -187,10 +263,19 @@ export function PromptBuilderPanel({
 function buildCharacterPrompt(
   templateBody: string,
   character: CharacterWithWorldview,
-  stylePromptPrefix: string,
+  styleGuide: StyleGuide | null,
 ) {
   const values: Record<string, string> = {
-    'style.prompt_prefix': stylePromptPrefix,
+    'style.name': styleGuide?.name ?? '',
+    'style.animation_style': styleGuide?.animation_style ?? '',
+    'style.color_palette': styleGuide?.color_palette ?? '',
+    'style.camera_style': styleGuide?.camera_style ?? '',
+    'style.lighting_style': styleGuide?.lighting_style ?? '',
+    'style.mood': styleGuide?.mood ?? '',
+    'style.reference_keywords': styleGuide?.reference_keywords?.join(', ') ?? '',
+    'style.negative_style': styleGuide?.negative_style ?? '',
+    'style.prompt_prefix': styleGuide?.prompt_prefix ?? '',
+    'style.prompt_suffix': styleGuide?.prompt_suffix ?? '',
     'character.name': character.name,
     'character.role': character.role ?? '',
     'character.gender': character.gender ?? '',
