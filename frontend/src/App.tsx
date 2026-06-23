@@ -32,6 +32,10 @@ import {
   type RelationshipWithCharacters,
 } from './services/relationshipService'
 import {
+  getStyleGuidesByProject,
+  type StyleGuide,
+} from './services/styleGuideService'
+import {
   getWorldviewsByProject,
   type Worldview,
 } from './services/worldviewService'
@@ -48,6 +52,7 @@ function App() {
   const [factions, setFactions] = useState<FactionWithWorldview[]>([])
   const [relationships, setRelationships] = useState<RelationshipWithCharacters[]>([])
   const [promptTemplates, setPromptTemplates] = useState<PromptTemplate[]>([])
+  const [styleGuides, setStyleGuides] = useState<StyleGuide[]>([])
   const [selectedCharacter, setSelectedCharacter] =
     useState<CharacterWithWorldview | null>(null)
 
@@ -58,6 +63,7 @@ function App() {
   const [isLoadingFactions, setIsLoadingFactions] = useState(true)
   const [isLoadingRelationships, setIsLoadingRelationships] = useState(true)
   const [isLoadingPromptTemplates, setIsLoadingPromptTemplates] = useState(true)
+  const [isLoadingStyleGuides, setIsLoadingStyleGuides] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   useEffect(() => {
@@ -138,6 +144,17 @@ function App() {
       .finally(() => {
         setIsLoadingPromptTemplates(false)
       })
+
+    getStyleGuidesByProject(ETERNAL_RIFT_PROJECT_ID)
+      .then((data) => {
+        setStyleGuides(data)
+      })
+      .catch((error) => {
+        setErrorMessage(error.message)
+      })
+      .finally(() => {
+        setIsLoadingStyleGuides(false)
+      })
   }, [])
 
   return (
@@ -163,6 +180,7 @@ function App() {
           factions={factions}
           relationships={relationships}
           promptTemplates={promptTemplates}
+          styleGuides={styleGuides}
           isLoadingProjects={isLoadingProjects}
           errorMessage={errorMessage}
         />
@@ -214,6 +232,7 @@ function App() {
         <PromptBuilderPanel
           characters={characters}
           promptTemplates={promptTemplates}
+          styleGuides={styleGuides}
         />
       )}
 
@@ -258,7 +277,7 @@ function PageIntro({ activeSection }: PageIntroProps) {
     relationships:
       'Eternal Rift 캐릭터 간 관계, 감정선, 갈등 구조를 확인합니다.',
     promptBuilder:
-      '캐릭터 데이터와 프롬프트 템플릿을 조합해 Google Flow용 최종 프롬프트를 생성합니다.',
+      '캐릭터 데이터, 스타일 가이드, 프롬프트 템플릿을 조합해 Google Flow용 최종 프롬프트를 생성합니다.',
     promptTemplates:
       'Google Flow용 프롬프트 템플릿과 변수를 확인합니다.',
   }
@@ -288,6 +307,7 @@ type OverviewSectionProps = {
   factions: FactionWithWorldview[]
   relationships: RelationshipWithCharacters[]
   promptTemplates: PromptTemplate[]
+  styleGuides: StyleGuide[]
   isLoadingProjects: boolean
   errorMessage: string | null
 }
@@ -300,12 +320,13 @@ function OverviewSection({
   factions,
   relationships,
   promptTemplates,
+  styleGuides,
   isLoadingProjects,
   errorMessage,
 }: OverviewSectionProps) {
   return (
     <>
-      <section className="mt-8 grid gap-4 md:grid-cols-4 xl:grid-cols-8">
+      <section className="mt-8 grid gap-4 md:grid-cols-4 xl:grid-cols-9">
         <SummaryCard label="Projects" value={projects.length} />
         <SummaryCard label="Characters" value={characters.length} />
         <SummaryCard label="Worldviews" value={worldviews.length} />
@@ -313,7 +334,8 @@ function OverviewSection({
         <SummaryCard label="Factions" value={factions.length} />
         <SummaryCard label="Relations" value={relationships.length} />
         <SummaryCard label="Templates" value={promptTemplates.length} />
-        <SummaryCard label="Current MVP" value="Read UI" />
+        <SummaryCard label="Styles" value={styleGuides.length} />
+        <SummaryCard label="Current MVP" value="Prompt" />
       </section>
 
       <section className="mt-8">
