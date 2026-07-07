@@ -230,6 +230,7 @@ function App() {
 
       {activeSection === 'promptBuilder' && (
         <PromptBuilderPanel
+          projectId={ETERNAL_RIFT_PROJECT_ID}
           characters={characters}
           locations={locations}
           promptTemplates={promptTemplates}
@@ -279,7 +280,7 @@ function PageIntro({ activeSection }: PageIntroProps) {
     relationships:
       'Eternal Rift 캐릭터 간 관계, 감정선, 갈등 구조를 확인합니다.',
     promptBuilder:
-      '캐릭터/장소 데이터, 스타일 가이드, 프롬프트 템플릿을 조합해 Google Flow용 최종 프롬프트를 생성합니다.',
+      '캐릭터/장소/장면 데이터, 스타일 가이드, 프롬프트 템플릿을 조합해 Google Flow용 최종 프롬프트를 생성하고 실행 기록으로 저장합니다.',
     promptTemplates:
       'Google Flow용 프롬프트 템플릿과 변수를 확인합니다.',
   }
