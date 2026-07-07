@@ -10,6 +10,13 @@ type PromptBuilderPanelProps = {
   isLoadingStyleGuides: boolean
 }
 
+type CopyTarget = 'positive' | 'negative'
+
+type CopyStatus = {
+  target: CopyTarget | null
+  status: 'idle' | 'copied' | 'failed'
+}
+
 export function PromptBuilderPanel({
   characters,
   promptTemplates,
@@ -24,9 +31,10 @@ export function PromptBuilderPanel({
   const [selectedCharacterId, setSelectedCharacterId] = useState('')
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [selectedStyleGuideId, setSelectedStyleGuideId] = useState('')
-  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>(
-    'idle',
-  )
+  const [copyStatus, setCopyStatus] = useState<CopyStatus>({
+    target: null,
+    status: 'idle',
+  })
 
   useEffect(() => {
     if (!selectedCharacterId && characters.length > 0) {
@@ -58,7 +66,7 @@ export function PromptBuilderPanel({
   const selectedStyleGuide =
     styleGuides.find((styleGuide) => styleGuide.id === selectedStyleGuideId) ?? null
 
-  const generatedPrompt = useMemo(() => {
+  const generatedPositivePrompt = useMemo(() => {
     if (!selectedCharacter || !selectedTemplate?.template_body) {
       return ''
     }
@@ -70,28 +78,46 @@ export function PromptBuilderPanel({
     )
   }, [selectedCharacter, selectedStyleGuide, selectedTemplate])
 
+  const generatedNegativePrompt = useMemo(() => {
+    if (!selectedCharacter && !selectedStyleGuide && !selectedTemplate) {
+      return ''
+    }
+
+    return buildNegativePrompt(
+      selectedCharacter,
+      selectedStyleGuide,
+      selectedTemplate,
+    )
+  }, [selectedCharacter, selectedStyleGuide, selectedTemplate])
+
   const unresolvedVariables = useMemo(() => {
     return Array.from(
       new Set(
-        generatedPrompt.match(/{{\s*[\w.]+\s*}}/g)?.map((variable) =>
+        generatedPositivePrompt.match(/{{\s*[\w.]+\s*}}/g)?.map((variable) =>
           variable.replace(/[{}\s]/g, ''),
         ) ?? [],
       ),
     )
-  }, [generatedPrompt])
+  }, [generatedPositivePrompt])
 
-  const handleCopy = async () => {
-    if (!generatedPrompt) {
+  const handleCopy = async (target: CopyTarget, prompt: string) => {
+    if (!prompt) {
       return
     }
 
     try {
-      await navigator.clipboard.writeText(generatedPrompt)
-      setCopyStatus('copied')
-      window.setTimeout(() => setCopyStatus('idle'), 2000)
+      await navigator.clipboard.writeText(prompt)
+      setCopyStatus({ target, status: 'copied' })
+      window.setTimeout(
+        () => setCopyStatus({ target: null, status: 'idle' }),
+        2000,
+      )
     } catch {
-      setCopyStatus('failed')
-      window.setTimeout(() => setCopyStatus('idle'), 2000)
+      setCopyStatus({ target, status: 'failed' })
+      window.setTimeout(
+        () => setCopyStatus({ target: null, status: 'idle' }),
+        2000,
+      )
     }
   }
 
@@ -187,6 +213,24 @@ export function PromptBuilderPanel({
 
           <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4">
             <p className="text-sm font-semibold text-slate-300">
+              Negative Prompt Sources
+            </p>
+            <p className="mt-3 text-sm leading-6 text-slate-400">
+              Character: {selectedCharacter?.negative_prompt ?? 'No character negative prompt'}
+            </p>
+            <p className="mt-3 text-sm leading-6 text-slate-400">
+              Style:{' '}
+              {isLoadingStyleGuides
+                ? 'Loading...'
+                : selectedStyleGuide?.negative_style ?? 'No style negative prompt'}
+            </p>
+            <p className="mt-3 text-sm leading-6 text-slate-400">
+              Template: {selectedTemplate?.negative_prompt ?? 'No template negative prompt'}
+            </p>
+          </div>
+
+          <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4">
+            <p className="text-sm font-semibold text-slate-300">
               Style Details
             </p>
             <p className="mt-3 text-sm leading-6 text-slate-400">
@@ -228,33 +272,18 @@ export function PromptBuilderPanel({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-lg shadow-black/20">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-slate-300">
-                Generated Prompt Preview
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                Google Flow에 바로 복사해 테스트할 수 있는 최종 프롬프트입니다.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleCopy}
-              disabled={!generatedPrompt}
-              className="rounded-xl border border-cyan-700 bg-cyan-950 px-4 py-2 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-900 disabled:cursor-not-allowed disabled:border-slate-800 disabled:bg-slate-950 disabled:text-slate-600"
-            >
-              {copyStatus === 'copied'
-                ? 'Copied'
-                : copyStatus === 'failed'
-                  ? 'Copy Failed'
-                  : 'Copy Prompt'}
-            </button>
-          </div>
+        <div className="grid gap-5">
+          <PromptPreviewCard
+            title="Positive Prompt Preview"
+            description="Google Flow의 Prompt 영역에 넣을 최종 프롬프트입니다."
+            prompt={generatedPositivePrompt}
+            emptyText="Positive Prompt를 생성하려면 캐릭터, 스타일, 템플릿 데이터가 필요합니다."
+            copyLabel={getCopyButtonLabel(copyStatus, 'positive', 'Copy Positive')}
+            onCopy={() => handleCopy('positive', generatedPositivePrompt)}
+          />
 
           {unresolvedVariables.length > 0 && (
-            <div className="mt-5 rounded-xl border border-yellow-700 bg-yellow-950/30 p-4 text-yellow-100">
+            <div className="rounded-xl border border-yellow-700 bg-yellow-950/30 p-4 text-yellow-100">
               <p className="text-sm font-semibold">Unresolved Variables</p>
               <p className="mt-2 text-sm text-yellow-200/80">
                 아래 변수는 현재 Builder에서 치환되지 않았습니다.
@@ -272,17 +301,110 @@ export function PromptBuilderPanel({
             </div>
           )}
 
-          <pre className="mt-5 min-h-[520px] whitespace-pre-wrap break-words rounded-xl border border-cyan-900 bg-cyan-950/20 p-5 text-sm leading-7 text-slate-300">
-            {generatedPrompt || '프롬프트를 생성하려면 캐릭터, 스타일, 템플릿 데이터가 필요합니다.'}
-          </pre>
+          <PromptPreviewCard
+            title="Negative Prompt Preview"
+            description="Google Flow에서 피해야 할 스타일, 캐릭터 표현, 생성 오류를 분리한 프롬프트입니다."
+            prompt={generatedNegativePrompt}
+            emptyText="Negative Prompt를 생성하려면 캐릭터 또는 스타일의 negative 데이터가 필요합니다."
+            copyLabel={getCopyButtonLabel(copyStatus, 'negative', 'Copy Negative')}
+            onCopy={() => handleCopy('negative', generatedNegativePrompt)}
+          />
         </div>
       </div>
     </section>
   )
 }
 
+type PromptPreviewCardProps = {
+  title: string
+  description: string
+  prompt: string
+  emptyText: string
+  copyLabel: string
+  onCopy: () => void
+}
+
+function PromptPreviewCard({
+  title,
+  description,
+  prompt,
+  emptyText,
+  copyLabel,
+  onCopy,
+}: PromptPreviewCardProps) {
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-lg shadow-black/20">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-300">{title}</p>
+          <p className="mt-1 text-xs text-slate-500">{description}</p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onCopy}
+          disabled={!prompt}
+          className="rounded-xl border border-cyan-700 bg-cyan-950 px-4 py-2 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-900 disabled:cursor-not-allowed disabled:border-slate-800 disabled:bg-slate-950 disabled:text-slate-600"
+        >
+          {copyLabel}
+        </button>
+      </div>
+
+      <pre className="mt-5 min-h-[260px] whitespace-pre-wrap break-words rounded-xl border border-cyan-900 bg-cyan-950/20 p-5 text-sm leading-7 text-slate-300">
+        {prompt || emptyText}
+      </pre>
+    </div>
+  )
+}
+
+function getCopyButtonLabel(
+  copyStatus: CopyStatus,
+  target: CopyTarget,
+  defaultLabel: string,
+) {
+  if (copyStatus.target !== target) {
+    return defaultLabel
+  }
+
+  if (copyStatus.status === 'copied') {
+    return 'Copied'
+  }
+
+  if (copyStatus.status === 'failed') {
+    return 'Copy Failed'
+  }
+
+  return defaultLabel
+}
+
 function buildCharacterPrompt(
   templateBody: string,
+  character: CharacterWithWorldview,
+  styleGuide: StyleGuide | null,
+) {
+  const values = buildPromptValues(character, styleGuide)
+
+  return templateBody.replace(/{{\s*([\w.]+)\s*}}/g, (_, key: string) => {
+    return values[key] ?? `{{${key}}}`
+  })
+}
+
+function buildNegativePrompt(
+  character: CharacterWithWorldview | null,
+  styleGuide: StyleGuide | null,
+  template: PromptTemplate | null,
+) {
+  return [
+    template?.negative_prompt,
+    character?.negative_prompt,
+    styleGuide?.negative_style,
+    styleGuide?.prompt_suffix,
+  ]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .join('\n\n')
+}
+
+function buildPromptValues(
   character: CharacterWithWorldview,
   styleGuide: StyleGuide | null,
 ) {
@@ -315,7 +437,5 @@ function buildCharacterPrompt(
     'character.worldview': character.worldviews?.name ?? '',
   }
 
-  return templateBody.replace(/{{\s*([\w.]+)\s*}}/g, (_, key: string) => {
-    return values[key] ?? `{{${key}}}`
-  })
+  return values
 }
