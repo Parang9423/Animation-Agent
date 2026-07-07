@@ -233,6 +233,7 @@ function App() {
           characters={characters}
           promptTemplates={promptTemplates}
           styleGuides={styleGuides}
+          isLoadingStyleGuides={isLoadingStyleGuides}
         />
       )}
 
