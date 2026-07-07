@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CharacterWithWorldview } from '../../services/characterService'
 import type { LocationWithWorldview } from '../../services/locationService'
+import {
+  createPromptRun,
+  type PromptRunType,
+} from '../../services/promptRunService'
 import type { PromptTemplate } from '../../services/promptTemplateService'
 import type { StyleGuide } from '../../services/styleGuideService'
 
 type PromptBuilderPanelProps = {
+  projectId: string
   characters: CharacterWithWorldview[]
   locations: LocationWithWorldview[]
   promptTemplates: PromptTemplate[]
@@ -19,6 +24,11 @@ type CopyTarget = 'positive' | 'negative'
 type CopyStatus = {
   target: CopyTarget | null
   status: 'idle' | 'copied' | 'failed'
+}
+
+type SaveStatus = {
+  status: 'idle' | 'saving' | 'saved' | 'failed'
+  message: string | null
 }
 
 type ScenePromptFields = {
@@ -44,6 +54,7 @@ const DEFAULT_SCENE_FIELDS: ScenePromptFields = {
 }
 
 export function PromptBuilderPanel({
+  projectId,
   characters,
   locations,
   promptTemplates,
@@ -60,6 +71,10 @@ export function PromptBuilderPanel({
   const [copyStatus, setCopyStatus] = useState<CopyStatus>({
     target: null,
     status: 'idle',
+  })
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>({
+    status: 'idle',
+    message: null,
   })
 
   const currentTemplates = useMemo(
@@ -226,6 +241,84 @@ export function PromptBuilderPanel({
         () => setCopyStatus({ target: null, status: 'idle' }),
         2000,
       )
+    }
+  }
+
+  const handleSavePromptRun = async () => {
+    if (!generatedPositivePrompt || !selectedTemplate) {
+      setSaveStatus({
+        status: 'failed',
+        message: 'Positive prompt와 template이 필요합니다.',
+      })
+      return
+    }
+
+    if (builderMode === 'character' && !selectedCharacter) {
+      setSaveStatus({
+        status: 'failed',
+        message: 'Character를 선택해야 저장할 수 있습니다.',
+      })
+      return
+    }
+
+    if (builderMode === 'location' && !selectedLocation) {
+      setSaveStatus({
+        status: 'failed',
+        message: 'Location을 선택해야 저장할 수 있습니다.',
+      })
+      return
+    }
+
+    if (builderMode === 'scene' && (!selectedCharacter || !selectedLocation)) {
+      setSaveStatus({
+        status: 'failed',
+        message: 'Scene 저장에는 Character와 Location이 모두 필요합니다.',
+      })
+      return
+    }
+
+    setSaveStatus({ status: 'saving', message: 'Saving prompt run...' })
+
+    try {
+      const promptRun = await createPromptRun({
+        project_id: projectId,
+        prompt_type: builderMode as PromptRunType,
+        target_tool: selectedTemplate.target_tool ?? 'google_flow',
+        template_id: selectedTemplate.id,
+        style_guide_id: selectedStyleGuide?.id ?? null,
+        character_id:
+          builderMode === 'character' || builderMode === 'scene'
+            ? selectedCharacter?.id ?? null
+            : null,
+        location_id:
+          builderMode === 'location' || builderMode === 'scene'
+            ? selectedLocation?.id ?? null
+            : null,
+        positive_prompt: generatedPositivePrompt,
+        negative_prompt: generatedNegativePrompt || null,
+        input_snapshot: buildInputSnapshot(
+          builderMode,
+          selectedCharacter,
+          selectedLocation,
+          selectedStyleGuide,
+          selectedTemplate,
+          sceneFields,
+        ),
+        output_status: 'draft',
+      })
+
+      setSaveStatus({
+        status: 'saved',
+        message: `Saved prompt run: ${promptRun.id.slice(0, 8)}`,
+      })
+    } catch (error) {
+      setSaveStatus({
+        status: 'failed',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Prompt run 저장 중 오류가 발생했습니다.',
+      })
     }
   }
 
@@ -444,6 +537,36 @@ export function PromptBuilderPanel({
               </label>
             </div>
           )}
+
+          <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4">
+            <p className="text-sm font-semibold text-slate-300">
+              Save Prompt Run
+            </p>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              현재 Positive / Negative Prompt와 선택 데이터를 prompt_runs 테이블에 draft 상태로 저장합니다.
+            </p>
+            <button
+              type="button"
+              onClick={handleSavePromptRun}
+              disabled={saveStatus.status === 'saving' || !generatedPositivePrompt}
+              className="mt-4 w-full rounded-xl border border-emerald-700 bg-emerald-950 px-4 py-3 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:border-slate-800 disabled:bg-slate-950 disabled:text-slate-600"
+            >
+              {saveStatus.status === 'saving' ? 'Saving...' : 'Save Prompt Run'}
+            </button>
+            {saveStatus.message && (
+              <p
+                className={`mt-3 text-sm ${
+                  saveStatus.status === 'failed'
+                    ? 'text-red-300'
+                    : saveStatus.status === 'saved'
+                      ? 'text-emerald-300'
+                      : 'text-slate-400'
+                }`}
+              >
+                {saveStatus.message}
+              </p>
+            )}
+          </div>
 
           <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4">
             <p className="text-sm font-semibold text-slate-300">
@@ -684,6 +807,55 @@ function buildNegativePrompt(
   ]
     .filter((value): value is string => Boolean(value?.trim()))
     .join('\n\n')
+}
+
+function buildInputSnapshot(
+  builderMode: BuilderMode,
+  character: CharacterWithWorldview | null,
+  location: LocationWithWorldview | null,
+  styleGuide: StyleGuide | null,
+  template: PromptTemplate | null,
+  sceneFields: ScenePromptFields,
+): Record<string, unknown> {
+  return {
+    builder_mode: builderMode,
+    target_tool: template?.target_tool ?? 'google_flow',
+    template: template
+      ? {
+          id: template.id,
+          name: template.name,
+          template_type: template.template_type,
+        }
+      : null,
+    style_guide: styleGuide
+      ? {
+          id: styleGuide.id,
+          name: styleGuide.name,
+          prompt_prefix: styleGuide.prompt_prefix,
+          prompt_suffix: styleGuide.prompt_suffix,
+        }
+      : null,
+    character: character
+      ? {
+          id: character.id,
+          name: character.name,
+          role: character.role,
+          prompt_summary: character.prompt_summary,
+          negative_prompt: character.negative_prompt,
+        }
+      : null,
+    location: location
+      ? {
+          id: location.id,
+          name: location.name,
+          type: location.type,
+          atmosphere: location.atmosphere,
+          prompt_summary: location.prompt_summary,
+          negative_prompt: location.negative_prompt,
+        }
+      : null,
+    scene_fields: builderMode === 'scene' ? sceneFields : null,
+  }
 }
 
 function buildStylePromptValues(styleGuide: StyleGuide | null) {
