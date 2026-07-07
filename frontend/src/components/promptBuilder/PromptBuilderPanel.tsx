@@ -7,12 +7,14 @@ type PromptBuilderPanelProps = {
   characters: CharacterWithWorldview[]
   promptTemplates: PromptTemplate[]
   styleGuides: StyleGuide[]
+  isLoadingStyleGuides: boolean
 }
 
 export function PromptBuilderPanel({
   characters,
   promptTemplates,
   styleGuides,
+  isLoadingStyleGuides,
 }: PromptBuilderPanelProps) {
   const characterTemplates = useMemo(
     () => promptTemplates.filter((template) => template.template_type === 'character'),
@@ -141,8 +143,13 @@ export function PromptBuilderPanel({
             <select
               value={selectedStyleGuideId}
               onChange={(event) => setSelectedStyleGuideId(event.target.value)}
-              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
+              disabled={isLoadingStyleGuides || styleGuides.length === 0}
+              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500 disabled:cursor-not-allowed disabled:text-slate-600"
             >
+              {isLoadingStyleGuides && <option>Loading style guides...</option>}
+              {!isLoadingStyleGuides && styleGuides.length === 0 && (
+                <option>No style guides</option>
+              )}
               {styleGuides.map((styleGuide) => (
                 <option key={styleGuide.id} value={styleGuide.id}>
                   {styleGuide.name}
@@ -172,7 +179,9 @@ export function PromptBuilderPanel({
               Style Prompt Prefix
             </p>
             <p className="mt-3 text-sm leading-6 text-slate-400">
-              {selectedStyleGuide?.prompt_prefix ?? 'No style prompt prefix'}
+              {isLoadingStyleGuides
+                ? 'Loading style prompt prefix...'
+                : selectedStyleGuide?.prompt_prefix ?? 'No style prompt prefix'}
             </p>
           </div>
 
@@ -181,13 +190,22 @@ export function PromptBuilderPanel({
               Style Details
             </p>
             <p className="mt-3 text-sm leading-6 text-slate-400">
-              Animation: {selectedStyleGuide?.animation_style ?? 'No animation style'}
+              Animation:{' '}
+              {isLoadingStyleGuides
+                ? 'Loading...'
+                : selectedStyleGuide?.animation_style ?? 'No animation style'}
             </p>
             <p className="mt-1 text-sm leading-6 text-slate-400">
-              Lighting: {selectedStyleGuide?.lighting_style ?? 'No lighting style'}
+              Lighting:{' '}
+              {isLoadingStyleGuides
+                ? 'Loading...'
+                : selectedStyleGuide?.lighting_style ?? 'No lighting style'}
             </p>
             <p className="mt-1 text-sm leading-6 text-slate-400">
-              Mood: {selectedStyleGuide?.mood ?? 'No mood'}
+              Mood:{' '}
+              {isLoadingStyleGuides
+                ? 'Loading...'
+                : selectedStyleGuide?.mood ?? 'No mood'}
             </p>
           </div>
 
@@ -199,7 +217,10 @@ export function PromptBuilderPanel({
               Character: {selectedCharacter?.name ?? 'No character'}
             </p>
             <p className="mt-1 text-sm leading-6 text-slate-400">
-              Style: {selectedStyleGuide?.name ?? 'No style guide'}
+              Style:{' '}
+              {isLoadingStyleGuides
+                ? 'Loading...'
+                : selectedStyleGuide?.name ?? 'No style guide'}
             </p>
             <p className="mt-1 text-sm leading-6 text-slate-400">
               Template: {selectedTemplate?.name ?? 'No template'}
