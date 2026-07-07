@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CharacterWithWorldview } from '../../services/characterService'
+import type { LocationWithWorldview } from '../../services/locationService'
 import type { PromptTemplate } from '../../services/promptTemplateService'
 import type { StyleGuide } from '../../services/styleGuideService'
 
 type PromptBuilderPanelProps = {
   characters: CharacterWithWorldview[]
+  locations: LocationWithWorldview[]
   promptTemplates: PromptTemplate[]
   styleGuides: StyleGuide[]
   isLoadingStyleGuides: boolean
 }
+
+type BuilderMode = 'character' | 'location'
 
 type CopyTarget = 'positive' | 'negative'
 
@@ -19,22 +23,25 @@ type CopyStatus = {
 
 export function PromptBuilderPanel({
   characters,
+  locations,
   promptTemplates,
   styleGuides,
   isLoadingStyleGuides,
 }: PromptBuilderPanelProps) {
-  const characterTemplates = useMemo(
-    () => promptTemplates.filter((template) => template.template_type === 'character'),
-    [promptTemplates],
-  )
-
+  const [builderMode, setBuilderMode] = useState<BuilderMode>('character')
   const [selectedCharacterId, setSelectedCharacterId] = useState('')
+  const [selectedLocationId, setSelectedLocationId] = useState('')
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [selectedStyleGuideId, setSelectedStyleGuideId] = useState('')
   const [copyStatus, setCopyStatus] = useState<CopyStatus>({
     target: null,
     status: 'idle',
   })
+
+  const currentTemplates = useMemo(
+    () => promptTemplates.filter((template) => template.template_type === builderMode),
+    [builderMode, promptTemplates],
+  )
 
   useEffect(() => {
     if (!selectedCharacterId && characters.length > 0) {
@@ -43,10 +50,25 @@ export function PromptBuilderPanel({
   }, [characters, selectedCharacterId])
 
   useEffect(() => {
-    if (!selectedTemplateId && characterTemplates.length > 0) {
-      setSelectedTemplateId(characterTemplates[0].id)
+    if (!selectedLocationId && locations.length > 0) {
+      setSelectedLocationId(locations[0].id)
     }
-  }, [characterTemplates, selectedTemplateId])
+  }, [locations, selectedLocationId])
+
+  useEffect(() => {
+    if (currentTemplates.length === 0) {
+      setSelectedTemplateId('')
+      return
+    }
+
+    const selectedTemplateExists = currentTemplates.some(
+      (template) => template.id === selectedTemplateId,
+    )
+
+    if (!selectedTemplateExists) {
+      setSelectedTemplateId(currentTemplates[0].id)
+    }
+  }, [currentTemplates, selectedTemplateId])
 
   useEffect(() => {
     if (!selectedStyleGuideId && styleGuides.length > 0) {
@@ -60,35 +82,50 @@ export function PromptBuilderPanel({
   const selectedCharacter =
     characters.find((character) => character.id === selectedCharacterId) ?? null
 
+  const selectedLocation =
+    locations.find((location) => location.id === selectedLocationId) ?? null
+
   const selectedTemplate =
-    characterTemplates.find((template) => template.id === selectedTemplateId) ?? null
+    currentTemplates.find((template) => template.id === selectedTemplateId) ?? null
 
   const selectedStyleGuide =
     styleGuides.find((styleGuide) => styleGuide.id === selectedStyleGuideId) ?? null
 
   const generatedPositivePrompt = useMemo(() => {
-    if (!selectedCharacter || !selectedTemplate?.template_body) {
+    if (!selectedTemplate?.template_body) {
       return ''
     }
 
-    return buildCharacterPrompt(
+    if (builderMode === 'character') {
+      if (!selectedCharacter) {
+        return ''
+      }
+
+      return buildPromptFromTemplate(
+        selectedTemplate.template_body,
+        buildCharacterPromptValues(selectedCharacter, selectedStyleGuide),
+      )
+    }
+
+    if (!selectedLocation) {
+      return ''
+    }
+
+    return buildPromptFromTemplate(
       selectedTemplate.template_body,
-      selectedCharacter,
-      selectedStyleGuide,
+      buildLocationPromptValues(selectedLocation, selectedStyleGuide),
     )
-  }, [selectedCharacter, selectedStyleGuide, selectedTemplate])
+  }, [builderMode, selectedCharacter, selectedLocation, selectedStyleGuide, selectedTemplate])
 
   const generatedNegativePrompt = useMemo(() => {
-    if (!selectedCharacter && !selectedStyleGuide && !selectedTemplate) {
-      return ''
-    }
-
     return buildNegativePrompt(
+      builderMode,
       selectedCharacter,
+      selectedLocation,
       selectedStyleGuide,
       selectedTemplate,
     )
-  }, [selectedCharacter, selectedStyleGuide, selectedTemplate])
+  }, [builderMode, selectedCharacter, selectedLocation, selectedStyleGuide, selectedTemplate])
 
   const unresolvedVariables = useMemo(() => {
     return Array.from(
@@ -99,6 +136,11 @@ export function PromptBuilderPanel({
       ),
     )
   }, [generatedPositivePrompt])
+
+  const selectedSubjectName =
+    builderMode === 'character'
+      ? selectedCharacter?.name ?? 'No character'
+      : selectedLocation?.name ?? 'No location'
 
   const handleCopy = async (target: CopyTarget, prompt: string) => {
     if (!prompt) {
@@ -127,12 +169,12 @@ export function PromptBuilderPanel({
         <div>
           <h2 className="text-2xl font-semibold">Prompt Builder</h2>
           <p className="mt-1 text-sm text-slate-500">
-            캐릭터 데이터, 스타일 가이드, Google Flow Character 템플릿을 조합해 최종 프롬프트를 생성합니다.
+            캐릭터/장소 데이터, 스타일 가이드, Google Flow 템플릿을 조합해 최종 프롬프트를 생성합니다.
           </p>
         </div>
 
         <span className="rounded-full border border-cyan-700 bg-cyan-950 px-3 py-1 text-sm text-cyan-200">
-          character MVP
+          {builderMode} MVP
         </span>
       </div>
 
@@ -142,27 +184,49 @@ export function PromptBuilderPanel({
 
           <label className="mt-5 block">
             <span className="text-sm text-slate-400">Template Type</span>
-            <input
-              value="character"
-              readOnly
-              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-300 outline-none"
-            />
-          </label>
-
-          <label className="mt-5 block">
-            <span className="text-sm text-slate-400">Character</span>
             <select
-              value={selectedCharacterId}
-              onChange={(event) => setSelectedCharacterId(event.target.value)}
+              value={builderMode}
+              onChange={(event) => setBuilderMode(event.target.value as BuilderMode)}
               className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
             >
-              {characters.map((character) => (
-                <option key={character.id} value={character.id}>
-                  {character.name}
-                </option>
-              ))}
+              <option value="character">character</option>
+              <option value="location">location</option>
             </select>
           </label>
+
+          {builderMode === 'character' && (
+            <label className="mt-5 block">
+              <span className="text-sm text-slate-400">Character</span>
+              <select
+                value={selectedCharacterId}
+                onChange={(event) => setSelectedCharacterId(event.target.value)}
+                className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
+              >
+                {characters.map((character) => (
+                  <option key={character.id} value={character.id}>
+                    {character.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {builderMode === 'location' && (
+            <label className="mt-5 block">
+              <span className="text-sm text-slate-400">Location</span>
+              <select
+                value={selectedLocationId}
+                onChange={(event) => setSelectedLocationId(event.target.value)}
+                className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
+              >
+                {locations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           <label className="mt-5 block">
             <span className="text-sm text-slate-400">Style Guide</span>
@@ -190,9 +254,11 @@ export function PromptBuilderPanel({
             <select
               value={selectedTemplateId}
               onChange={(event) => setSelectedTemplateId(event.target.value)}
-              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
+              disabled={currentTemplates.length === 0}
+              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500 disabled:cursor-not-allowed disabled:text-slate-600"
             >
-              {characterTemplates.map((template) => (
+              {currentTemplates.length === 0 && <option>No templates</option>}
+              {currentTemplates.map((template) => (
                 <option key={template.id} value={template.id}>
                   {template.name}
                 </option>
@@ -216,7 +282,10 @@ export function PromptBuilderPanel({
               Negative Prompt Sources
             </p>
             <p className="mt-3 text-sm leading-6 text-slate-400">
-              Character: {selectedCharacter?.negative_prompt ?? 'No character negative prompt'}
+              {builderMode === 'character' ? 'Character' : 'Location'}:{' '}
+              {builderMode === 'character'
+                ? selectedCharacter?.negative_prompt ?? 'No character negative prompt'
+                : selectedLocation?.negative_prompt ?? 'No location negative prompt'}
             </p>
             <p className="mt-3 text-sm leading-6 text-slate-400">
               Style:{' '}
@@ -258,7 +327,10 @@ export function PromptBuilderPanel({
               Selected Data
             </p>
             <p className="mt-3 text-sm leading-6 text-slate-400">
-              Character: {selectedCharacter?.name ?? 'No character'}
+              Mode: {builderMode}
+            </p>
+            <p className="mt-1 text-sm leading-6 text-slate-400">
+              Subject: {selectedSubjectName}
             </p>
             <p className="mt-1 text-sm leading-6 text-slate-400">
               Style:{' '}
@@ -277,7 +349,7 @@ export function PromptBuilderPanel({
             title="Positive Prompt Preview"
             description="Google Flow의 Prompt 영역에 넣을 최종 프롬프트입니다."
             prompt={generatedPositivePrompt}
-            emptyText="Positive Prompt를 생성하려면 캐릭터, 스타일, 템플릿 데이터가 필요합니다."
+            emptyText="Positive Prompt를 생성하려면 대상, 스타일, 템플릿 데이터가 필요합니다."
             copyLabel={getCopyButtonLabel(copyStatus, 'positive', 'Copy Positive')}
             onCopy={() => handleCopy('positive', generatedPositivePrompt)}
           />
@@ -303,9 +375,9 @@ export function PromptBuilderPanel({
 
           <PromptPreviewCard
             title="Negative Prompt Preview"
-            description="Google Flow에서 피해야 할 스타일, 캐릭터 표현, 생성 오류를 분리한 프롬프트입니다."
+            description="Google Flow에서 피해야 할 스타일, 대상 표현, 생성 오류를 분리한 프롬프트입니다."
             prompt={generatedNegativePrompt}
-            emptyText="Negative Prompt를 생성하려면 캐릭터 또는 스타일의 negative 데이터가 필요합니다."
+            emptyText="Negative Prompt를 생성하려면 대상 또는 스타일의 negative 데이터가 필요합니다."
             copyLabel={getCopyButtonLabel(copyStatus, 'negative', 'Copy Negative')}
             onCopy={() => handleCopy('negative', generatedNegativePrompt)}
           />
@@ -377,26 +449,25 @@ function getCopyButtonLabel(
   return defaultLabel
 }
 
-function buildCharacterPrompt(
+function buildPromptFromTemplate(
   templateBody: string,
-  character: CharacterWithWorldview,
-  styleGuide: StyleGuide | null,
+  values: Record<string, string>,
 ) {
-  const values = buildPromptValues(character, styleGuide)
-
   return templateBody.replace(/{{\s*([\w.]+)\s*}}/g, (_, key: string) => {
     return values[key] ?? `{{${key}}}`
   })
 }
 
 function buildNegativePrompt(
+  builderMode: BuilderMode,
   character: CharacterWithWorldview | null,
+  location: LocationWithWorldview | null,
   styleGuide: StyleGuide | null,
   template: PromptTemplate | null,
 ) {
   return [
     template?.negative_prompt,
-    character?.negative_prompt,
+    builderMode === 'character' ? character?.negative_prompt : location?.negative_prompt,
     styleGuide?.negative_style,
     styleGuide?.prompt_suffix,
   ]
@@ -404,11 +475,8 @@ function buildNegativePrompt(
     .join('\n\n')
 }
 
-function buildPromptValues(
-  character: CharacterWithWorldview,
-  styleGuide: StyleGuide | null,
-) {
-  const values: Record<string, string> = {
+function buildStylePromptValues(styleGuide: StyleGuide | null) {
+  return {
     'style.name': styleGuide?.name ?? '',
     'style.animation_style': styleGuide?.animation_style ?? '',
     'style.color_palette': styleGuide?.color_palette ?? '',
@@ -419,6 +487,15 @@ function buildPromptValues(
     'style.negative_style': styleGuide?.negative_style ?? '',
     'style.prompt_prefix': styleGuide?.prompt_prefix ?? '',
     'style.prompt_suffix': styleGuide?.prompt_suffix ?? '',
+  }
+}
+
+function buildCharacterPromptValues(
+  character: CharacterWithWorldview,
+  styleGuide: StyleGuide | null,
+) {
+  return {
+    ...buildStylePromptValues(styleGuide),
     'character.name': character.name,
     'character.role': character.role ?? '',
     'character.gender': character.gender ?? '',
@@ -436,6 +513,23 @@ function buildPromptValues(
     'character.signature_items': character.signature_items?.join(', ') ?? '',
     'character.worldview': character.worldviews?.name ?? '',
   }
+}
 
-  return values
+function buildLocationPromptValues(
+  location: LocationWithWorldview,
+  styleGuide: StyleGuide | null,
+) {
+  return {
+    ...buildStylePromptValues(styleGuide),
+    'location.name': location.name,
+    'location.type': location.type ?? '',
+    'location.description': location.description ?? '',
+    'location.atmosphere': location.atmosphere ?? '',
+    'location.visual_elements': location.visual_elements?.join(', ') ?? '',
+    'location.related_factions': location.related_factions?.join(', ') ?? '',
+    'location.related_characters': location.related_characters?.join(', ') ?? '',
+    'location.prompt_summary': location.prompt_summary ?? '',
+    'location.negative_prompt': location.negative_prompt ?? '',
+    'location.worldview': location.worldviews?.name ?? '',
+  }
 }
