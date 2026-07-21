@@ -1,3 +1,4 @@
+import { ApprovedAssetPreview } from '../assets/ApprovedAssetPreview'
 import type { LocationWithWorldview } from '../../services/locationService'
 
 type LocationCardProps = {
@@ -22,6 +23,13 @@ export function LocationCard({ location }: LocationCardProps) {
           location
         </span>
       </div>
+
+      <ApprovedAssetPreview
+        relatedEntityType="location"
+        relatedEntityId={location.id}
+        assetType="location_image"
+        label="Representative Location Image"
+      />
 
       <p className="mt-5 leading-7 text-slate-300">
         {location.description ?? 'No description'}
