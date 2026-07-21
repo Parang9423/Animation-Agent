@@ -9,10 +9,13 @@ export type CharacterWithWorldview = {
   role: string | null
   gender: string | null
   age_range: string | null
+  age_text?: string | null
   personality: string | null
   speech_style: string | null
   appearance: string | null
+  visual_description?: string | null
   outfit: string | null
+  costume?: string | null
   signature_items: string[] | null
   goal: string | null
   weakness: string | null
@@ -47,5 +50,10 @@ export async function getCharactersByProject(
     throw error
   }
 
-  return data ?? []
+  return (data ?? []).map((character) => ({
+    ...character,
+    age_text: character.age_range ?? null,
+    visual_description: character.appearance ?? null,
+    costume: character.outfit ?? null,
+  }))
 }
