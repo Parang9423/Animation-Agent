@@ -144,6 +144,17 @@ export async function updateAssetStatus(
   return data
 }
 
+export async function deleteAsset(assetId: string): Promise<void> {
+  const { error } = await supabase
+    .from('assets')
+    .delete()
+    .eq('id', assetId)
+
+  if (error) {
+    throw error
+  }
+}
+
 export async function uploadAssetFile({
   file,
   projectSlug,
