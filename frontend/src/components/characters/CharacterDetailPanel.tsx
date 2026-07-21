@@ -1,3 +1,4 @@
+import { ApprovedAssetPreview } from '../assets/ApprovedAssetPreview'
 import { DetailBlock } from '../common/DetailBlock'
 import type { CharacterWithWorldview } from '../../services/characterService'
 
@@ -25,6 +26,13 @@ export function CharacterDetailPanel({ character }: CharacterDetailPanelProps) {
           {character.worldviews?.name ?? 'No worldview'}
         </span>
       </div>
+
+      <ApprovedAssetPreview
+        relatedEntityType="character"
+        relatedEntityId={character.id}
+        assetType="character_image"
+        label="Representative Character Image"
+      />
 
       <div className="mt-8 grid gap-5 lg:grid-cols-2">
         <DetailBlock title="Personality" value={character.personality} />
