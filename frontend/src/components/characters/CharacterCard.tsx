@@ -1,3 +1,4 @@
+import { ApprovedAssetPreview } from '../assets/ApprovedAssetPreview'
 import type { CharacterWithWorldview } from '../../services/characterService'
 
 type CharacterCardProps = {
@@ -34,6 +35,14 @@ export function CharacterCard({
           {character.age_range ?? 'N/A'}
         </span>
       </div>
+
+      <ApprovedAssetPreview
+        relatedEntityType="character"
+        relatedEntityId={character.id}
+        assetType="character_image"
+        label="Representative Image"
+        compact
+      />
 
       <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950 p-3">
         <p className="text-xs uppercase tracking-wide text-slate-500">
