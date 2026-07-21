@@ -20,7 +20,6 @@ const ASSET_STATUS_OPTIONS: AssetStatus[] = [
 
 export function AssetCard({ asset }: AssetCardProps) {
   const promptRunSubject = getPromptRunSubject(asset)
-  const assetUrl = asset.external_url ?? asset.storage_path
   const [currentStatus, setCurrentStatus] = useState<AssetStatus>(
     normalizeAssetStatus(asset.status),
   )
