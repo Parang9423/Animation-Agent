@@ -4,7 +4,10 @@ import {
   type AssetStatus,
   type AssetWithPromptRun,
 } from '../../services/assetService'
-import type { PromptRunWithDetails } from '../../services/promptRunService'
+import {
+  deletePromptRun,
+  type PromptRunWithDetails,
+} from '../../services/promptRunService'
 
 type PromptRunCardProps = {
   promptRun: PromptRunWithDetails
@@ -13,6 +16,7 @@ type PromptRunCardProps = {
 }
 
 type StatusSaveState = 'idle' | 'saving' | 'saved' | 'failed'
+type DeleteState = 'idle' | 'deleting' | 'failed'
 
 const ASSET_STATUS_OPTIONS: AssetStatus[] = [
   'candidate',
@@ -29,6 +33,41 @@ export function PromptRunCard({
   const createdAt = new Date(promptRun.created_at).toLocaleString()
   const subjectLabel = getSubjectLabel(promptRun)
   const approvedAssets = assets.filter((asset) => asset.status === 'approved')
+  const [deleteState, setDeleteState] = useState<DeleteState>('idle')
+  const [deleteMessage, setDeleteMessage] = useState<string | null>(null)
+
+  const handleDeletePromptRun = async () => {
+    const linkedAssetMessage =
+      assets.length > 0
+        ? `\n\n이 Prompt Run에 연결된 Asset ${assets.length}개는 삭제되지 않고 prompt_run 연결만 해제됩니다.`
+        : ''
+
+    const shouldDelete = window.confirm(
+      `이 Prompt Run을 삭제할까요?\n\n${subjectLabel}\nID: ${promptRun.id.slice(
+        0,
+        8,
+      )}${linkedAssetMessage}`,
+    )
+
+    if (!shouldDelete) {
+      return
+    }
+
+    setDeleteState('deleting')
+    setDeleteMessage('Deleting prompt run...')
+
+    try {
+      await deletePromptRun(promptRun.id)
+      window.location.reload()
+    } catch (error) {
+      setDeleteState('failed')
+      setDeleteMessage(
+        error instanceof Error
+          ? error.message
+          : 'Prompt Run 삭제 중 오류가 발생했습니다.',
+      )
+    }
+  }
 
   return (
     <article className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-lg shadow-black/20">
@@ -67,6 +106,23 @@ export function PromptRunCard({
         <div className="text-right text-xs text-slate-500">
           <p>{createdAt}</p>
           <p className="mt-1 font-mono">{promptRun.id.slice(0, 8)}</p>
+          <button
+            type="button"
+            onClick={handleDeletePromptRun}
+            disabled={deleteState === 'deleting'}
+            className="mt-3 rounded-lg border border-red-800 bg-red-950 px-3 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-900 disabled:cursor-not-allowed disabled:border-slate-800 disabled:bg-slate-950 disabled:text-slate-600"
+          >
+            {deleteState === 'deleting' ? 'Deleting...' : 'Delete Run'}
+          </button>
+          {deleteMessage && (
+            <p
+              className={`mt-2 max-w-52 text-xs ${
+                deleteState === 'failed' ? 'text-red-300' : 'text-slate-400'
+              }`}
+            >
+              {deleteMessage}
+            </p>
+          )}
         </div>
       </div>
 
