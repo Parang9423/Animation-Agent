@@ -17,6 +17,24 @@ type SaveStatus = {
   message: string | null
 }
 
+const ASSET_TYPE_OPTIONS = [
+  'character_image',
+  'location_image',
+  'scene_image',
+  'video',
+  'reference',
+  'other',
+]
+
+const SOURCE_TYPE_OPTIONS = [
+  'google_flow',
+  'manual_upload',
+  'external',
+  'reference',
+]
+
+const STATUS_OPTIONS = ['candidate', 'approved', 'rejected', 'archived']
+
 export function AssetCreateForm({
   projectId,
   promptRuns,
@@ -188,13 +206,11 @@ export function AssetCreateForm({
             onChange={(event) => setAssetType(event.target.value)}
             className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
           >
-            <option value="character_image">character_image</option>
-            <option value="location_image">location_image</option>
-            <option value="scene_image">scene_image</option>
-            <option value="image">image</option>
-            <option value="video">video</option>
-            <option value="reference">reference</option>
-            <option value="other">other</option>
+            {ASSET_TYPE_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
           </select>
         </label>
 
@@ -205,10 +221,11 @@ export function AssetCreateForm({
             onChange={(event) => setSourceType(event.target.value)}
             className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
           >
-            <option value="google_flow">google_flow</option>
-            <option value="uploaded">uploaded</option>
-            <option value="external">external</option>
-            <option value="manual">manual</option>
+            {SOURCE_TYPE_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
           </select>
         </label>
 
@@ -219,10 +236,11 @@ export function AssetCreateForm({
             onChange={(event) => setStatus(event.target.value)}
             className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
           >
-            <option value="candidate">candidate</option>
-            <option value="approved">approved</option>
-            <option value="rejected">rejected</option>
-            <option value="archived">archived</option>
+            {STATUS_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
           </select>
         </label>
 
