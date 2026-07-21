@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { AssetCard } from './components/assets/AssetCard'
+import { AssetCreateForm } from './components/assets/AssetCreateForm'
 import { CharacterCard } from './components/characters/CharacterCard'
 import { CharacterDetailPanel } from './components/characters/CharacterDetailPanel'
 import { FactionCard } from './components/factions/FactionCard'
@@ -11,6 +13,10 @@ import { RelationshipCard } from './components/relationships/RelationshipCard'
 import { WorldviewCard } from './components/worldviews/WorldviewCard'
 import { AppLayout } from './layouts/AppLayout'
 import type { AppSection } from './layouts/Sidebar'
+import {
+  getAssetsByProject,
+  type AssetWithPromptRun,
+} from './services/assetService'
 import { getProjects, type Project } from './services/projectService'
 import {
   getCharactersByProject,
@@ -58,6 +64,7 @@ function App() {
   const [relationships, setRelationships] = useState<RelationshipWithCharacters[]>([])
   const [promptTemplates, setPromptTemplates] = useState<PromptTemplate[]>([])
   const [promptRuns, setPromptRuns] = useState<PromptRunWithDetails[]>([])
+  const [assets, setAssets] = useState<AssetWithPromptRun[]>([])
   const [styleGuides, setStyleGuides] = useState<StyleGuide[]>([])
   const [selectedCharacter, setSelectedCharacter] =
     useState<CharacterWithWorldview | null>(null)
@@ -70,8 +77,23 @@ function App() {
   const [isLoadingRelationships, setIsLoadingRelationships] = useState(true)
   const [isLoadingPromptTemplates, setIsLoadingPromptTemplates] = useState(true)
   const [isLoadingPromptRuns, setIsLoadingPromptRuns] = useState(true)
+  const [isLoadingAssets, setIsLoadingAssets] = useState(true)
   const [isLoadingStyleGuides, setIsLoadingStyleGuides] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const loadAssets = () => {
+    setIsLoadingAssets(true)
+    getAssetsByProject(ETERNAL_RIFT_PROJECT_ID)
+      .then((data) => {
+        setAssets(data)
+      })
+      .catch((error) => {
+        setErrorMessage(error.message)
+      })
+      .finally(() => {
+        setIsLoadingAssets(false)
+      })
+  }
 
   useEffect(() => {
     getProjects()
@@ -163,6 +185,8 @@ function App() {
         setIsLoadingPromptRuns(false)
       })
 
+    loadAssets()
+
     getStyleGuidesByProject(ETERNAL_RIFT_PROJECT_ID)
       .then((data) => {
         setStyleGuides(data)
@@ -199,6 +223,7 @@ function App() {
           relationships={relationships}
           promptTemplates={promptTemplates}
           promptRuns={promptRuns}
+          assets={assets}
           styleGuides={styleGuides}
           isLoadingProjects={isLoadingProjects}
           errorMessage={errorMessage}
@@ -266,6 +291,17 @@ function App() {
         />
       )}
 
+      {activeSection === 'assets' && (
+        <AssetsSection
+          projectId={ETERNAL_RIFT_PROJECT_ID}
+          assets={assets}
+          promptRuns={promptRuns}
+          isLoadingAssets={isLoadingAssets}
+          errorMessage={errorMessage}
+          onAssetCreated={loadAssets}
+        />
+      )}
+
       {activeSection === 'promptTemplates' && (
         <PromptTemplatesSection
           promptTemplates={promptTemplates}
@@ -291,6 +327,7 @@ function PageIntro({ activeSection }: PageIntroProps) {
     relationships: 'Relationships',
     promptBuilder: 'Prompt Builder',
     promptRuns: 'Prompt Runs',
+    assets: 'Assets',
     promptTemplates: 'Prompt Templates',
   }
 
@@ -311,6 +348,8 @@ function PageIntro({ activeSection }: PageIntroProps) {
       '캐릭터/장소/장면 데이터, 스타일 가이드, 프롬프트 템플릿을 조합해 Google Flow용 최종 프롬프트를 생성하고 실행 기록으로 저장합니다.',
     promptRuns:
       'Prompt Builder에서 저장한 프롬프트 실행 기록과 입력 스냅샷을 확인합니다.',
+    assets:
+      'Google Flow 생성 결과 이미지와 영상 후보를 등록하고 prompt run과 연결합니다.',
     promptTemplates:
       'Google Flow용 프롬프트 템플릿과 변수를 확인합니다.',
   }
@@ -341,6 +380,7 @@ type OverviewSectionProps = {
   relationships: RelationshipWithCharacters[]
   promptTemplates: PromptTemplate[]
   promptRuns: PromptRunWithDetails[]
+  assets: AssetWithPromptRun[]
   styleGuides: StyleGuide[]
   isLoadingProjects: boolean
   errorMessage: string | null
@@ -355,13 +395,14 @@ function OverviewSection({
   relationships,
   promptTemplates,
   promptRuns,
+  assets,
   styleGuides,
   isLoadingProjects,
   errorMessage,
 }: OverviewSectionProps) {
   return (
     <>
-      <section className="mt-8 grid gap-4 md:grid-cols-4 xl:grid-cols-10">
+      <section className="mt-8 grid gap-4 md:grid-cols-4 xl:grid-cols-11">
         <SummaryCard label="Projects" value={projects.length} />
         <SummaryCard label="Characters" value={characters.length} />
         <SummaryCard label="Worldviews" value={worldviews.length} />
@@ -370,8 +411,9 @@ function OverviewSection({
         <SummaryCard label="Relations" value={relationships.length} />
         <SummaryCard label="Templates" value={promptTemplates.length} />
         <SummaryCard label="Runs" value={promptRuns.length} />
+        <SummaryCard label="Assets" value={assets.length} />
         <SummaryCard label="Styles" value={styleGuides.length} />
-        <SummaryCard label="Current MVP" value="Prompt" />
+        <SummaryCard label="Current MVP" value="Assets" />
       </section>
 
       <section className="mt-8">
@@ -685,6 +727,63 @@ function PromptRunsSection({
         {promptRuns.map((promptRun) => (
           <PromptRunCard key={promptRun.id} promptRun={promptRun} />
         ))}
+      </div>
+    </section>
+  )
+}
+
+type AssetsSectionProps = {
+  projectId: string
+  assets: AssetWithPromptRun[]
+  promptRuns: PromptRunWithDetails[]
+  isLoadingAssets: boolean
+  errorMessage: string | null
+  onAssetCreated: () => void
+}
+
+function AssetsSection({
+  projectId,
+  assets,
+  promptRuns,
+  isLoadingAssets,
+  errorMessage,
+  onAssetCreated,
+}: AssetsSectionProps) {
+  return (
+    <section className="mt-8">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold">Assets</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Google Flow 생성 결과와 외부 산출물을 prompt run에 연결합니다.
+          </p>
+        </div>
+
+        <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-sm text-slate-300">
+          {assets.length} assets
+        </span>
+      </div>
+
+      <AssetCreateForm
+        projectId={projectId}
+        promptRuns={promptRuns}
+        onCreated={onAssetCreated}
+      />
+
+      <div className="mt-8">
+        {isLoadingAssets && <p className="text-slate-400">Loading assets...</p>}
+
+        {!isLoadingAssets && !errorMessage && assets.length === 0 && (
+          <div className="rounded-xl border border-slate-800 bg-slate-900 p-5 text-slate-300">
+            등록된 Asset이 없습니다.
+          </div>
+        )}
+
+        <div className="grid gap-5">
+          {assets.map((asset) => (
+            <AssetCard key={asset.id} asset={asset} />
+          ))}
+        </div>
       </div>
     </section>
   )
