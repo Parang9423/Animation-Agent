@@ -5,6 +5,7 @@ import { FactionCard } from './components/factions/FactionCard'
 import { LocationCard } from './components/locations/LocationCard'
 import { ProjectCard } from './components/projects/ProjectCard'
 import { PromptBuilderPanel } from './components/promptBuilder/PromptBuilderPanel'
+import { PromptRunCard } from './components/promptRuns/PromptRunCard'
 import { PromptTemplateCard } from './components/promptTemplates/PromptTemplateCard'
 import { RelationshipCard } from './components/relationships/RelationshipCard'
 import { WorldviewCard } from './components/worldviews/WorldviewCard'
@@ -23,6 +24,10 @@ import {
   getLocationsByProject,
   type LocationWithWorldview,
 } from './services/locationService'
+import {
+  getPromptRunsByProject,
+  type PromptRunWithDetails,
+} from './services/promptRunService'
 import {
   getPromptTemplatesByProject,
   type PromptTemplate,
@@ -52,6 +57,7 @@ function App() {
   const [factions, setFactions] = useState<FactionWithWorldview[]>([])
   const [relationships, setRelationships] = useState<RelationshipWithCharacters[]>([])
   const [promptTemplates, setPromptTemplates] = useState<PromptTemplate[]>([])
+  const [promptRuns, setPromptRuns] = useState<PromptRunWithDetails[]>([])
   const [styleGuides, setStyleGuides] = useState<StyleGuide[]>([])
   const [selectedCharacter, setSelectedCharacter] =
     useState<CharacterWithWorldview | null>(null)
@@ -63,6 +69,7 @@ function App() {
   const [isLoadingFactions, setIsLoadingFactions] = useState(true)
   const [isLoadingRelationships, setIsLoadingRelationships] = useState(true)
   const [isLoadingPromptTemplates, setIsLoadingPromptTemplates] = useState(true)
+  const [isLoadingPromptRuns, setIsLoadingPromptRuns] = useState(true)
   const [isLoadingStyleGuides, setIsLoadingStyleGuides] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -145,6 +152,17 @@ function App() {
         setIsLoadingPromptTemplates(false)
       })
 
+    getPromptRunsByProject(ETERNAL_RIFT_PROJECT_ID)
+      .then((data) => {
+        setPromptRuns(data)
+      })
+      .catch((error) => {
+        setErrorMessage(error.message)
+      })
+      .finally(() => {
+        setIsLoadingPromptRuns(false)
+      })
+
     getStyleGuidesByProject(ETERNAL_RIFT_PROJECT_ID)
       .then((data) => {
         setStyleGuides(data)
@@ -180,6 +198,7 @@ function App() {
           factions={factions}
           relationships={relationships}
           promptTemplates={promptTemplates}
+          promptRuns={promptRuns}
           styleGuides={styleGuides}
           isLoadingProjects={isLoadingProjects}
           errorMessage={errorMessage}
@@ -239,6 +258,14 @@ function App() {
         />
       )}
 
+      {activeSection === 'promptRuns' && (
+        <PromptRunsSection
+          promptRuns={promptRuns}
+          isLoadingPromptRuns={isLoadingPromptRuns}
+          errorMessage={errorMessage}
+        />
+      )}
+
       {activeSection === 'promptTemplates' && (
         <PromptTemplatesSection
           promptTemplates={promptTemplates}
@@ -263,6 +290,7 @@ function PageIntro({ activeSection }: PageIntroProps) {
     factions: 'Factions',
     relationships: 'Relationships',
     promptBuilder: 'Prompt Builder',
+    promptRuns: 'Prompt Runs',
     promptTemplates: 'Prompt Templates',
   }
 
@@ -281,6 +309,8 @@ function PageIntro({ activeSection }: PageIntroProps) {
       'Eternal Rift 캐릭터 간 관계, 감정선, 갈등 구조를 확인합니다.',
     promptBuilder:
       '캐릭터/장소/장면 데이터, 스타일 가이드, 프롬프트 템플릿을 조합해 Google Flow용 최종 프롬프트를 생성하고 실행 기록으로 저장합니다.',
+    promptRuns:
+      'Prompt Builder에서 저장한 프롬프트 실행 기록과 입력 스냅샷을 확인합니다.',
     promptTemplates:
       'Google Flow용 프롬프트 템플릿과 변수를 확인합니다.',
   }
@@ -310,6 +340,7 @@ type OverviewSectionProps = {
   factions: FactionWithWorldview[]
   relationships: RelationshipWithCharacters[]
   promptTemplates: PromptTemplate[]
+  promptRuns: PromptRunWithDetails[]
   styleGuides: StyleGuide[]
   isLoadingProjects: boolean
   errorMessage: string | null
@@ -323,13 +354,14 @@ function OverviewSection({
   factions,
   relationships,
   promptTemplates,
+  promptRuns,
   styleGuides,
   isLoadingProjects,
   errorMessage,
 }: OverviewSectionProps) {
   return (
     <>
-      <section className="mt-8 grid gap-4 md:grid-cols-4 xl:grid-cols-9">
+      <section className="mt-8 grid gap-4 md:grid-cols-4 xl:grid-cols-10">
         <SummaryCard label="Projects" value={projects.length} />
         <SummaryCard label="Characters" value={characters.length} />
         <SummaryCard label="Worldviews" value={worldviews.length} />
@@ -337,6 +369,7 @@ function OverviewSection({
         <SummaryCard label="Factions" value={factions.length} />
         <SummaryCard label="Relations" value={relationships.length} />
         <SummaryCard label="Templates" value={promptTemplates.length} />
+        <SummaryCard label="Runs" value={promptRuns.length} />
         <SummaryCard label="Styles" value={styleGuides.length} />
         <SummaryCard label="Current MVP" value="Prompt" />
       </section>
@@ -606,6 +639,51 @@ function RelationshipsSection({
             key={relationship.id}
             relationship={relationship}
           />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+type PromptRunsSectionProps = {
+  promptRuns: PromptRunWithDetails[]
+  isLoadingPromptRuns: boolean
+  errorMessage: string | null
+}
+
+function PromptRunsSection({
+  promptRuns,
+  isLoadingPromptRuns,
+  errorMessage,
+}: PromptRunsSectionProps) {
+  return (
+    <section className="mt-8">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold">Prompt Runs</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Prompt Builder에서 저장한 프롬프트 실행 기록
+          </p>
+        </div>
+
+        <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-sm text-slate-300">
+          {promptRuns.length} runs
+        </span>
+      </div>
+
+      {isLoadingPromptRuns && (
+        <p className="text-slate-400">Loading prompt runs...</p>
+      )}
+
+      {!isLoadingPromptRuns && !errorMessage && promptRuns.length === 0 && (
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-5 text-slate-300">
+          저장된 Prompt Run이 없습니다.
+        </div>
+      )}
+
+      <div className="grid gap-5">
+        {promptRuns.map((promptRun) => (
+          <PromptRunCard key={promptRun.id} promptRun={promptRun} />
         ))}
       </div>
     </section>
