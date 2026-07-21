@@ -13,6 +13,7 @@ type PromptRunCardProps = {
   promptRun: PromptRunWithDetails
   assets?: AssetWithPromptRun[]
   onAssetStatusChanged?: () => void
+  onPromptRunDeleted?: () => void
 }
 
 type StatusSaveState = 'idle' | 'saving' | 'saved' | 'failed'
@@ -29,6 +30,7 @@ export function PromptRunCard({
   promptRun,
   assets = [],
   onAssetStatusChanged,
+  onPromptRunDeleted,
 }: PromptRunCardProps) {
   const createdAt = new Date(promptRun.created_at).toLocaleString()
   const subjectLabel = getSubjectLabel(promptRun)
@@ -60,6 +62,7 @@ export function PromptRunCard({
     try {
       await deletePromptRun(promptRun.id)
       setIsDeleted(true)
+      onPromptRunDeleted?.()
       onAssetStatusChanged?.()
     } catch (error) {
       setDeleteState('failed')
