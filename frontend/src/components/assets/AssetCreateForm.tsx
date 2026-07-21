@@ -3,6 +3,7 @@ import {
   createAsset,
   uploadAssetFile,
   type Asset,
+  type AssetStatus,
   type CreateAssetInput,
 } from '../../services/assetService'
 import type { PromptRunWithDetails } from '../../services/promptRunService'
@@ -39,7 +40,12 @@ const SOURCE_TYPE_OPTIONS = [
   'reference',
 ]
 
-const STATUS_OPTIONS = ['candidate', 'approved', 'rejected', 'archived']
+const STATUS_OPTIONS: AssetStatus[] = [
+  'candidate',
+  'approved',
+  'rejected',
+  'archived',
+]
 const PROJECT_SLUG = 'eternal-rift'
 
 export function AssetCreateForm({
@@ -50,7 +56,7 @@ export function AssetCreateForm({
   const [promptRunId, setPromptRunId] = useState('')
   const [assetType, setAssetType] = useState('scene_image')
   const [sourceType, setSourceType] = useState('google_flow')
-  const [status, setStatus] = useState('candidate')
+  const [status, setStatus] = useState<AssetStatus>('candidate')
   const [relatedEntityType, setRelatedEntityType] = useState('scene')
   const [relatedEntityId, setRelatedEntityId] = useState('')
   const [externalUrl, setExternalUrl] = useState('')
@@ -307,7 +313,7 @@ export function AssetCreateForm({
           <span className="text-sm text-slate-400">Status</span>
           <select
             value={status}
-            onChange={(event) => setStatus(event.target.value)}
+            onChange={(event) => setStatus(event.target.value as AssetStatus)}
             className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
           >
             {STATUS_OPTIONS.map((option) => (
