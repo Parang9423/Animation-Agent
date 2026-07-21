@@ -27,6 +27,25 @@ export type PromptRun = {
   updated_at: string
 }
 
+export type PromptRunWithDetails = PromptRun & {
+  prompt_templates: {
+    name: string
+    template_type: string | null
+    target_tool: string | null
+  } | null
+  style_guides: {
+    name: string
+  } | null
+  characters: {
+    name: string
+    role: string | null
+  } | null
+  locations: {
+    name: string
+    type: string | null
+  } | null
+}
+
 export type CreatePromptRunInput = {
   project_id: string
   prompt_type: PromptRunType
@@ -69,4 +88,40 @@ export async function createPromptRun(
   }
 
   return data
+}
+
+export async function getPromptRunsByProject(
+  projectId: string,
+): Promise<PromptRunWithDetails[]> {
+  const { data, error } = await supabase
+    .from('prompt_runs')
+    .select(
+      `
+      *,
+      prompt_templates (
+        name,
+        template_type,
+        target_tool
+      ),
+      style_guides (
+        name
+      ),
+      characters (
+        name,
+        role
+      ),
+      locations (
+        name,
+        type
+      )
+    `,
+    )
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    throw error
+  }
+
+  return data ?? []
 }
