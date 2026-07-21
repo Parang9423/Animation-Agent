@@ -62,6 +62,13 @@ export type UploadedAssetFile = {
   public_url: string
 }
 
+export type ApprovedEntityAssetInput = {
+  relatedEntityType: 'character' | 'location' | string
+  relatedEntityId: string
+  assetType: 'character_image' | 'location_image' | 'scene_image' | string
+  projectId?: string | null
+}
+
 const ASSET_BUCKET_NAME = 'assets'
 
 export async function getAssetsByProject(
@@ -95,6 +102,37 @@ export async function getAssetsByProject(
   }
 
   return data ?? []
+}
+
+export async function getApprovedAssetByEntity({
+  relatedEntityType,
+  relatedEntityId,
+  assetType,
+  projectId,
+}: ApprovedEntityAssetInput): Promise<Asset | null> {
+  let query = supabase
+    .from('assets')
+    .select('*')
+    .eq('related_entity_type', relatedEntityType)
+    .eq('related_entity_id', relatedEntityId)
+    .eq('asset_type', assetType)
+    .eq('status', 'approved')
+    .not('external_url', 'is', null)
+    .order('updated_at', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  if (projectId) {
+    query = query.eq('project_id', projectId)
+  }
+
+  const { data, error } = await query.maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  return data ?? null
 }
 
 export async function createAsset(asset: CreateAssetInput): Promise<Asset> {
