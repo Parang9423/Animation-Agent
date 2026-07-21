@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AssetCard } from './components/assets/AssetCard'
 import { AssetCreateForm } from './components/assets/AssetCreateForm'
 import { CharacterCard } from './components/characters/CharacterCard'
@@ -84,7 +84,21 @@ function App() {
   const [isLoadingStyleGuides, setIsLoadingStyleGuides] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const loadAssets = () => {
+  const loadPromptRuns = useCallback(() => {
+    setIsLoadingPromptRuns(true)
+    getPromptRunsByProject(ETERNAL_RIFT_PROJECT_ID)
+      .then((data) => {
+        setPromptRuns(data)
+      })
+      .catch((error) => {
+        setErrorMessage(error.message)
+      })
+      .finally(() => {
+        setIsLoadingPromptRuns(false)
+      })
+  }, [])
+
+  const loadAssets = useCallback(() => {
     setIsLoadingAssets(true)
     getAssetsByProject(ETERNAL_RIFT_PROJECT_ID)
       .then((data) => {
@@ -96,7 +110,12 @@ function App() {
       .finally(() => {
         setIsLoadingAssets(false)
       })
-  }
+  }, [])
+
+  const refreshPromptRunDependentData = useCallback(() => {
+    loadPromptRuns()
+    loadAssets()
+  }, [loadAssets, loadPromptRuns])
 
   useEffect(() => {
     getProjects()
@@ -137,18 +156,14 @@ function App() {
       .catch((error) => setErrorMessage(error.message))
       .finally(() => setIsLoadingPromptTemplates(false))
 
-    getPromptRunsByProject(ETERNAL_RIFT_PROJECT_ID)
-      .then((data) => setPromptRuns(data))
-      .catch((error) => setErrorMessage(error.message))
-      .finally(() => setIsLoadingPromptRuns(false))
-
+    loadPromptRuns()
     loadAssets()
 
     getStyleGuidesByProject(ETERNAL_RIFT_PROJECT_ID)
       .then((data) => setStyleGuides(data))
       .catch((error) => setErrorMessage(error.message))
       .finally(() => setIsLoadingStyleGuides(false))
-  }, [])
+  }, [loadAssets, loadPromptRuns])
 
   return (
     <AppLayout
@@ -231,6 +246,7 @@ function App() {
           promptTemplates={promptTemplates}
           styleGuides={styleGuides}
           isLoadingStyleGuides={isLoadingStyleGuides}
+          onPromptRunCreated={loadPromptRuns}
         />
       )}
 
@@ -241,6 +257,7 @@ function App() {
           isLoadingPromptRuns={isLoadingPromptRuns}
           errorMessage={errorMessage}
           onAssetStatusChanged={loadAssets}
+          onPromptRunDeleted={refreshPromptRunDependentData}
         />
       )}
 
@@ -252,6 +269,7 @@ function App() {
           isLoadingAssets={isLoadingAssets}
           errorMessage={errorMessage}
           onAssetCreated={loadAssets}
+          onAssetChanged={loadAssets}
         />
       )}
 
@@ -349,7 +367,7 @@ function OverviewSection({
 }: OverviewSectionProps) {
   return (
     <>
-      <section className="mt-8 grid gap-4 md:grid-cols-4 xl:grid-cols-11">
+      <section className="overview-summary-grid mt-8 grid gap-4 md:grid-cols-4 xl:grid-cols-11">
         <SummaryCard label="Projects" value={projects.length} />
         <SummaryCard label="Characters" value={characters.length} />
         <SummaryCard label="Worldviews" value={worldviews.length} />
@@ -588,6 +606,7 @@ type PromptRunsSectionProps = {
   isLoadingPromptRuns: boolean
   errorMessage: string | null
   onAssetStatusChanged: () => void
+  onPromptRunDeleted: () => void
 }
 
 function PromptRunsSection({
@@ -596,6 +615,7 @@ function PromptRunsSection({
   isLoadingPromptRuns,
   errorMessage,
   onAssetStatusChanged,
+  onPromptRunDeleted,
 }: PromptRunsSectionProps) {
   const assetsByPromptRunId = useMemo(
     () =>
@@ -643,6 +663,7 @@ function PromptRunsSection({
             promptRun={promptRun}
             assets={assetsByPromptRunId[promptRun.id] ?? []}
             onAssetStatusChanged={onAssetStatusChanged}
+            onPromptRunDeleted={onPromptRunDeleted}
           />
         ))}
       </div>
@@ -660,6 +681,7 @@ type AssetsSectionProps = {
   isLoadingAssets: boolean
   errorMessage: string | null
   onAssetCreated: () => void
+  onAssetChanged: () => void
 }
 
 function AssetsSection({
@@ -669,6 +691,7 @@ function AssetsSection({
   isLoadingAssets,
   errorMessage,
   onAssetCreated,
+  onAssetChanged,
 }: AssetsSectionProps) {
   const [statusFilter, setStatusFilter] = useState<AssetFilterValue>('all')
   const [assetTypeFilter, setAssetTypeFilter] = useState<AssetFilterValue>('all')
@@ -810,7 +833,12 @@ function AssetsSection({
 
         <div className="grid gap-5">
           {filteredAssets.map((asset) => (
-            <AssetCard key={asset.id} asset={asset} />
+            <AssetCard
+              key={asset.id}
+              asset={asset}
+              onChanged={onAssetChanged}
+              onDeleted={onAssetChanged}
+            />
           ))}
         </div>
       </div>
@@ -899,13 +927,13 @@ type SectionHeaderProps = {
 
 function SectionHeader({ title, description, countLabel }: SectionHeaderProps) {
   return (
-    <div className="mb-4 flex items-center justify-between">
+    <div className="mb-4 flex items-center justify-between gap-4">
       <div>
         <h2 className="text-2xl font-semibold">{title}</h2>
         <p className="mt-1 text-sm text-slate-500">{description}</p>
       </div>
 
-      <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-sm text-slate-300">
+      <span className="shrink-0 rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-sm text-slate-300">
         {countLabel}
       </span>
     </div>
@@ -931,9 +959,13 @@ type SummaryCardProps = {
 
 function SummaryCard({ label, value }: SummaryCardProps) {
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-      <p className="text-sm uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-3 text-3xl font-bold text-slate-100">{value}</p>
+    <div className="summary-card rounded-2xl border border-slate-800 bg-slate-900 p-5">
+      <p className="summary-card-label text-sm uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <p className="summary-card-value mt-3 text-3xl font-bold text-slate-100">
+        {value}
+      </p>
     </div>
   )
 }
