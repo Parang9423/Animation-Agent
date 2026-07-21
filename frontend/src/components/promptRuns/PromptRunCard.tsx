@@ -35,6 +35,7 @@ export function PromptRunCard({
   const approvedAssets = assets.filter((asset) => asset.status === 'approved')
   const [deleteState, setDeleteState] = useState<DeleteState>('idle')
   const [deleteMessage, setDeleteMessage] = useState<string | null>(null)
+  const [isDeleted, setIsDeleted] = useState(false)
 
   const handleDeletePromptRun = async () => {
     const linkedAssetMessage =
@@ -58,7 +59,8 @@ export function PromptRunCard({
 
     try {
       await deletePromptRun(promptRun.id)
-      window.location.reload()
+      setIsDeleted(true)
+      onAssetStatusChanged?.()
     } catch (error) {
       setDeleteState('failed')
       setDeleteMessage(
@@ -67,6 +69,10 @@ export function PromptRunCard({
           : 'Prompt Run 삭제 중 오류가 발생했습니다.',
       )
     }
+  }
+
+  if (isDeleted) {
+    return null
   }
 
   return (
