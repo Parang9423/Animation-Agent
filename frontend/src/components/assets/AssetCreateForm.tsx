@@ -1,6 +1,7 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
 import {
   createAsset,
+  uploadAssetFile,
   type Asset,
   type CreateAssetInput,
 } from '../../services/assetService'
@@ -14,6 +15,11 @@ type AssetCreateFormProps = {
 
 type SaveStatus = {
   status: 'idle' | 'saving' | 'saved' | 'failed'
+  message: string | null
+}
+
+type UploadStatus = {
+  status: 'idle' | 'uploading' | 'uploaded' | 'failed'
   message: string | null
 }
 
@@ -34,6 +40,7 @@ const SOURCE_TYPE_OPTIONS = [
 ]
 
 const STATUS_OPTIONS = ['candidate', 'approved', 'rejected', 'archived']
+const PROJECT_SLUG = 'eternal-rift'
 
 export function AssetCreateForm({
   projectId,
@@ -48,11 +55,16 @@ export function AssetCreateForm({
   const [relatedEntityId, setRelatedEntityId] = useState('')
   const [externalUrl, setExternalUrl] = useState('')
   const [storagePath, setStoragePath] = useState('')
+  const [selectedFileName, setSelectedFileName] = useState('')
   const [promptUsed, setPromptUsed] = useState('')
   const [metadataText, setMetadataText] = useState(`{
   "selected_candidate": true
 }`)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({
+    status: 'idle',
+    message: null,
+  })
+  const [uploadStatus, setUploadStatus] = useState<UploadStatus>({
     status: 'idle',
     message: null,
   })
@@ -109,6 +121,66 @@ export function AssetCreateForm({
     )
   }
 
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+
+    if (!file) {
+      return
+    }
+
+    setSelectedFileName(file.name)
+    setUploadStatus({ status: 'uploading', message: 'Uploading file...' })
+
+    try {
+      const uploadedFile = await uploadAssetFile({
+        file,
+        projectSlug: PROJECT_SLUG,
+        assetType,
+        promptRunId,
+      })
+
+      setStoragePath(uploadedFile.storage_path)
+      setExternalUrl(uploadedFile.public_url)
+      setSourceType('manual_upload')
+      setUploadStatus({
+        status: 'uploaded',
+        message: `Uploaded to ${uploadedFile.storage_path}`,
+      })
+      mergeMetadata({
+        storage_bucket: uploadedFile.bucket,
+        uploaded_file_name: file.name,
+        uploaded_file_size: file.size,
+        uploaded_file_type: file.type || null,
+      })
+    } catch (error) {
+      setUploadStatus({
+        status: 'failed',
+        message:
+          error instanceof Error
+            ? error.message
+            : '파일 업로드 중 오류가 발생했습니다.',
+      })
+    }
+  }
+
+  const mergeMetadata = (nextMetadata: Record<string, unknown>) => {
+    try {
+      const currentMetadata = metadataText.trim() ? JSON.parse(metadataText) : {}
+      setMetadataText(
+        JSON.stringify(
+          {
+            ...currentMetadata,
+            ...nextMetadata,
+          },
+          null,
+          2,
+        ),
+      )
+    } catch {
+      setMetadataText(JSON.stringify(nextMetadata, null, 2))
+    }
+  }
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
@@ -157,6 +229,8 @@ export function AssetCreateForm({
       })
       setExternalUrl('')
       setStoragePath('')
+      setSelectedFileName('')
+      setUploadStatus({ status: 'idle', message: null })
     } catch (error) {
       setSaveStatus({
         status: 'failed',
@@ -268,6 +342,44 @@ export function AssetCreateForm({
             className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
           />
         </label>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950 p-4">
+        <label className="block">
+          <span className="text-sm font-semibold text-slate-300">
+            Upload Asset File
+          </span>
+          <p className="mt-1 text-xs text-slate-500">
+            Google Flow에서 다운로드한 이미지/영상 파일을 Supabase Storage assets bucket에 업로드합니다.
+          </p>
+          <input
+            type="file"
+            accept="image/*,video/*"
+            onChange={handleFileChange}
+            disabled={uploadStatus.status === 'uploading'}
+            className="mt-3 block w-full text-sm text-slate-300 file:mr-4 file:rounded-xl file:border-0 file:bg-cyan-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-cyan-100 hover:file:bg-cyan-900 disabled:cursor-not-allowed"
+          />
+        </label>
+
+        {selectedFileName && (
+          <p className="mt-2 text-xs text-slate-500">
+            Selected file: {selectedFileName}
+          </p>
+        )}
+
+        {uploadStatus.message && (
+          <p
+            className={`mt-3 text-sm ${
+              uploadStatus.status === 'failed'
+                ? 'text-red-300'
+                : uploadStatus.status === 'uploaded'
+                  ? 'text-emerald-300'
+                  : 'text-slate-400'
+            }`}
+          >
+            {uploadStatus.message}
+          </p>
+        )}
       </div>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
