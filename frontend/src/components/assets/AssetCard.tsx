@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  deleteAsset,
   updateAssetStatus,
   type AssetStatus,
   type AssetWithPromptRun,
@@ -7,9 +8,12 @@ import {
 
 type AssetCardProps = {
   asset: AssetWithPromptRun
+  onChanged?: () => void
+  onDeleted?: () => void
 }
 
 type StatusSaveState = 'idle' | 'saving' | 'saved' | 'failed'
+type DeleteState = 'idle' | 'deleting' | 'failed'
 
 const ASSET_STATUS_OPTIONS: AssetStatus[] = [
   'candidate',
@@ -18,7 +22,7 @@ const ASSET_STATUS_OPTIONS: AssetStatus[] = [
   'archived',
 ]
 
-export function AssetCard({ asset }: AssetCardProps) {
+export function AssetCard({ asset, onChanged, onDeleted }: AssetCardProps) {
   const promptRunSubject = getPromptRunSubject(asset)
   const [currentStatus, setCurrentStatus] = useState<AssetStatus>(
     normalizeAssetStatus(asset.status),
@@ -26,6 +30,9 @@ export function AssetCard({ asset }: AssetCardProps) {
   const [statusSaveState, setStatusSaveState] =
     useState<StatusSaveState>('idle')
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
+  const [deleteState, setDeleteState] = useState<DeleteState>('idle')
+  const [deleteMessage, setDeleteMessage] = useState<string | null>(null)
+  const [isDeleted, setIsDeleted] = useState(false)
   const [imageFailed, setImageFailed] = useState(false)
 
   const shouldShowImagePreview =
@@ -44,6 +51,7 @@ export function AssetCard({ asset }: AssetCardProps) {
       await updateAssetStatus(asset.id, nextStatus)
       setStatusSaveState('saved')
       setStatusMessage(`Status updated to ${nextStatus}`)
+      onChanged?.()
       window.setTimeout(() => {
         setStatusSaveState('idle')
         setStatusMessage(null)
@@ -57,6 +65,39 @@ export function AssetCard({ asset }: AssetCardProps) {
           : 'Asset status 변경 중 오류가 발생했습니다.',
       )
     }
+  }
+
+  const handleDeleteAsset = async () => {
+    const shouldDelete = window.confirm(
+      `이 Asset을 삭제할까요?\n\n${promptRunSubject}\nID: ${asset.id.slice(
+        0,
+        8,
+      )}\n\nDB의 assets row만 삭제됩니다. Storage 파일은 현재 단계에서는 유지됩니다.`,
+    )
+
+    if (!shouldDelete) {
+      return
+    }
+
+    setDeleteState('deleting')
+    setDeleteMessage('Deleting asset...')
+
+    try {
+      await deleteAsset(asset.id)
+      setIsDeleted(true)
+      onDeleted?.()
+    } catch (error) {
+      setDeleteState('failed')
+      setDeleteMessage(
+        error instanceof Error
+          ? error.message
+          : 'Asset 삭제 중 오류가 발생했습니다.',
+      )
+    }
+  }
+
+  if (isDeleted) {
+    return null
   }
 
   return (
@@ -87,6 +128,23 @@ export function AssetCard({ asset }: AssetCardProps) {
         <div className="text-right text-xs text-slate-500">
           <p>Entity: {asset.related_entity_type ?? 'none'}</p>
           <p>Run: {asset.prompt_run_id?.slice(0, 8) ?? 'No run'}</p>
+          <button
+            type="button"
+            onClick={handleDeleteAsset}
+            disabled={deleteState === 'deleting'}
+            className="mt-3 rounded-lg border border-red-800 bg-red-950 px-3 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-900 disabled:cursor-not-allowed disabled:border-slate-800 disabled:bg-slate-950 disabled:text-slate-600"
+          >
+            {deleteState === 'deleting' ? 'Deleting...' : 'Delete Asset'}
+          </button>
+          {deleteMessage && (
+            <p
+              className={`mt-2 max-w-52 text-xs ${
+                deleteState === 'failed' ? 'text-red-300' : 'text-slate-400'
+              }`}
+            >
+              {deleteMessage}
+            </p>
+          )}
         </div>
       </div>
 
