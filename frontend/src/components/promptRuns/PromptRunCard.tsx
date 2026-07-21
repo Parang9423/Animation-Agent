@@ -35,6 +35,8 @@ export function PromptRunCard({
   const createdAt = new Date(promptRun.created_at).toLocaleString()
   const subjectLabel = getSubjectLabel(promptRun)
   const approvedAssets = assets.filter((asset) => asset.status === 'approved')
+  const representativeSceneAsset =
+    promptRun.prompt_type === 'scene' ? getRepresentativeSceneAsset(assets) : null
   const [deleteState, setDeleteState] = useState<DeleteState>('idle')
   const [deleteMessage, setDeleteMessage] = useState<string | null>(null)
   const [isDeleted, setIsDeleted] = useState(false)
@@ -135,6 +137,10 @@ export function PromptRunCard({
         </div>
       </div>
 
+      {promptRun.prompt_type === 'scene' && (
+        <RepresentativeSceneImage asset={representativeSceneAsset} />
+      )}
+
       <PromptRunAssets
         assets={assets}
         onAssetStatusChanged={onAssetStatusChanged}
@@ -160,6 +166,62 @@ export function PromptRunCard({
         </pre>
       </details>
     </article>
+  )
+}
+
+type RepresentativeSceneImageProps = {
+  asset: AssetWithPromptRun | null
+}
+
+function RepresentativeSceneImage({ asset }: RepresentativeSceneImageProps) {
+  const [imageFailed, setImageFailed] = useState(false)
+
+  if (!asset) {
+    return (
+      <section className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4 text-sm text-slate-500">
+        아직 approved scene_image가 없습니다. Asset Candidates에서 대표로 사용할 씬 이미지를 approved로 변경하세요.
+      </section>
+    )
+  }
+
+  const shouldShowImagePreview = Boolean(asset.external_url) && !imageFailed
+
+  return (
+    <section className="mt-5 overflow-hidden rounded-xl border border-emerald-800 bg-emerald-950/10">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-900/60 p-4">
+        <div>
+          <p className="text-sm font-semibold text-emerald-100">
+            Representative Scene Image
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            approved scene_image 중 최신 Asset을 이 Prompt Run의 대표 씬 이미지로 표시합니다.
+          </p>
+        </div>
+        <span className="rounded-full border border-emerald-700 bg-emerald-950 px-3 py-1 text-xs font-semibold text-emerald-100">
+          approved
+        </span>
+      </div>
+
+      {shouldShowImagePreview ? (
+        <div className="flex max-h-[520px] items-center justify-center bg-slate-950">
+          <img
+            src={asset.external_url ?? ''}
+            alt="Representative scene"
+            onError={() => setImageFailed(true)}
+            className="max-h-[520px] w-full object-contain"
+          />
+        </div>
+      ) : (
+        <div className="flex h-64 items-center justify-center bg-slate-950 px-4 text-center text-sm text-slate-500">
+          대표 씬 이미지 preview를 불러오지 못했습니다.
+        </div>
+      )}
+
+      <div className="grid gap-3 p-4 text-xs text-slate-500 md:grid-cols-2">
+        <p>Asset ID: {asset.id.slice(0, 8)}</p>
+        <p>Updated: {new Date(asset.updated_at).toLocaleString()}</p>
+      </div>
+    </section>
   )
 }
 
@@ -354,6 +416,28 @@ function getSubjectLabel(promptRun: PromptRunWithDetails) {
   const locationName = promptRun.locations?.name ?? 'No location'
 
   return `${characterName} @ ${locationName}`
+}
+
+function getRepresentativeSceneAsset(assets: AssetWithPromptRun[]) {
+  return (
+    assets
+      .filter(
+        (asset) =>
+          asset.status === 'approved' &&
+          asset.asset_type === 'scene_image' &&
+          Boolean(asset.external_url),
+      )
+      .sort((firstAsset, secondAsset) => {
+        const firstUpdatedAt = new Date(
+          firstAsset.updated_at ?? firstAsset.created_at,
+        ).getTime()
+        const secondUpdatedAt = new Date(
+          secondAsset.updated_at ?? secondAsset.created_at,
+        ).getTime()
+
+        return secondUpdatedAt - firstUpdatedAt
+      })[0] ?? null
+  )
 }
 
 function normalizeAssetStatus(status: AssetWithPromptRun['status']): AssetStatus {
