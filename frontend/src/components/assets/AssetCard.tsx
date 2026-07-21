@@ -1,12 +1,64 @@
-import type { AssetWithPromptRun } from '../../services/assetService'
+import { useState } from 'react'
+import {
+  updateAssetStatus,
+  type AssetStatus,
+  type AssetWithPromptRun,
+} from '../../services/assetService'
 
 type AssetCardProps = {
   asset: AssetWithPromptRun
 }
 
+type StatusSaveState = 'idle' | 'saving' | 'saved' | 'failed'
+
+const ASSET_STATUS_OPTIONS: AssetStatus[] = [
+  'candidate',
+  'approved',
+  'rejected',
+  'archived',
+]
+
 export function AssetCard({ asset }: AssetCardProps) {
   const promptRunSubject = getPromptRunSubject(asset)
   const assetUrl = asset.external_url ?? asset.storage_path
+  const [currentStatus, setCurrentStatus] = useState<AssetStatus>(
+    normalizeAssetStatus(asset.status),
+  )
+  const [statusSaveState, setStatusSaveState] =
+    useState<StatusSaveState>('idle')
+  const [statusMessage, setStatusMessage] = useState<string | null>(null)
+  const [imageFailed, setImageFailed] = useState(false)
+
+  const shouldShowImagePreview =
+    Boolean(asset.external_url) &&
+    !imageFailed &&
+    (isLikelyImageUrl(asset.external_url ?? '') || isImageAsset(asset.asset_type))
+
+  const handleStatusChange = async (nextStatus: AssetStatus) => {
+    const previousStatus = currentStatus
+
+    setCurrentStatus(nextStatus)
+    setStatusSaveState('saving')
+    setStatusMessage('Saving status...')
+
+    try {
+      await updateAssetStatus(asset.id, nextStatus)
+      setStatusSaveState('saved')
+      setStatusMessage(`Status updated to ${nextStatus}`)
+      window.setTimeout(() => {
+        setStatusSaveState('idle')
+        setStatusMessage(null)
+      }, 2000)
+    } catch (error) {
+      setCurrentStatus(previousStatus)
+      setStatusSaveState('failed')
+      setStatusMessage(
+        error instanceof Error
+          ? error.message
+          : 'Asset status 변경 중 오류가 발생했습니다.',
+      )
+    }
+  }
 
   return (
     <article className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-lg shadow-black/20">
@@ -16,8 +68,8 @@ export function AssetCard({ asset }: AssetCardProps) {
             <span className="rounded-full border border-cyan-700 bg-cyan-950 px-3 py-1 text-xs font-semibold text-cyan-100">
               {asset.asset_type ?? 'asset'}
             </span>
-            <span className="rounded-full border border-emerald-700 bg-emerald-950 px-3 py-1 text-xs font-semibold text-emerald-100">
-              {asset.status ?? 'candidate'}
+            <span className={getStatusBadgeClassName(currentStatus)}>
+              {currentStatus}
             </span>
             <span className="rounded-full border border-slate-700 bg-slate-950 px-3 py-1 text-xs text-slate-300">
               {asset.source_type ?? 'unknown source'}
@@ -39,13 +91,66 @@ export function AssetCard({ asset }: AssetCardProps) {
         </div>
       </div>
 
-      {asset.external_url && isLikelyImageUrl(asset.external_url) && (
+      <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-slate-300">Asset Status</p>
+            <p className="mt-1 text-xs text-slate-500">
+              후보/승인/폐기/보관 상태를 즉시 변경합니다.
+            </p>
+          </div>
+
+          <select
+            value={currentStatus}
+            onChange={(event) =>
+              handleStatusChange(event.target.value as AssetStatus)
+            }
+            disabled={statusSaveState === 'saving'}
+            className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-200 outline-none focus:border-cyan-500 disabled:cursor-not-allowed disabled:text-slate-600"
+          >
+            {ASSET_STATUS_OPTIONS.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {statusMessage && (
+          <p
+            className={`mt-3 text-sm ${
+              statusSaveState === 'failed'
+                ? 'text-red-300'
+                : statusSaveState === 'saved'
+                  ? 'text-emerald-300'
+                  : 'text-slate-400'
+            }`}
+          >
+            {statusMessage}
+          </p>
+        )}
+      </div>
+
+      {shouldShowImagePreview && (
         <div className="mt-5 overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
           <img
-            src={asset.external_url}
+            src={asset.external_url ?? ''}
             alt={promptRunSubject}
+            onError={() => setImageFailed(true)}
             className="max-h-[420px] w-full object-contain"
           />
+        </div>
+      )}
+
+      {asset.external_url && imageFailed && (
+        <div className="mt-5 rounded-xl border border-yellow-800 bg-yellow-950/20 p-4 text-sm text-yellow-100">
+          이미지 미리보기를 불러오지 못했습니다. 외부 링크 접근 권한 또는 URL 만료 여부를 확인하세요.
+        </div>
+      )}
+
+      {!asset.external_url && asset.storage_path && (
+        <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4 text-sm text-slate-400">
+          Storage path만 등록되어 있습니다. Supabase Storage preview 연결은 이후 단계에서 추가할 수 있습니다.
         </div>
       )}
 
@@ -106,6 +211,41 @@ function getPromptRunSubject(asset: AssetWithPromptRun) {
   }
 
   return characterName ?? locationName ?? `${asset.prompt_runs.prompt_type} prompt run`
+}
+
+function normalizeAssetStatus(status: AssetWithPromptRun['status']): AssetStatus {
+  if (
+    status === 'approved' ||
+    status === 'rejected' ||
+    status === 'archived' ||
+    status === 'candidate'
+  ) {
+    return status
+  }
+
+  return 'candidate'
+}
+
+function getStatusBadgeClassName(status: AssetStatus) {
+  const baseClassName = 'rounded-full border px-3 py-1 text-xs font-semibold'
+
+  if (status === 'approved') {
+    return `${baseClassName} border-emerald-700 bg-emerald-950 text-emerald-100`
+  }
+
+  if (status === 'rejected') {
+    return `${baseClassName} border-red-700 bg-red-950 text-red-100`
+  }
+
+  if (status === 'archived') {
+    return `${baseClassName} border-slate-700 bg-slate-950 text-slate-300`
+  }
+
+  return `${baseClassName} border-yellow-700 bg-yellow-950 text-yellow-100`
+}
+
+function isImageAsset(assetType: string | null) {
+  return Boolean(assetType?.toLowerCase().includes('image'))
 }
 
 function isLikelyImageUrl(url: string) {
