@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import {
   createAsset,
   type Asset,
@@ -31,9 +31,9 @@ export function AssetCreateForm({
   const [externalUrl, setExternalUrl] = useState('')
   const [storagePath, setStoragePath] = useState('')
   const [promptUsed, setPromptUsed] = useState('')
-  const [metadataText, setMetadataText] = useState('{
+  const [metadataText, setMetadataText] = useState(`{
   "selected_candidate": true
-}')
+}`)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({
     status: 'idle',
     message: null,
@@ -91,7 +91,7 @@ export function AssetCreateForm({
     )
   }
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
     if (!externalUrl.trim() && !storagePath.trim()) {
@@ -105,9 +105,7 @@ export function AssetCreateForm({
     let generationMetadata: Record<string, unknown> = {}
 
     try {
-      generationMetadata = metadataText.trim()
-        ? JSON.parse(metadataText)
-        : {}
+      generationMetadata = metadataText.trim() ? JSON.parse(metadataText) : {}
     } catch {
       setSaveStatus({
         status: 'failed',
