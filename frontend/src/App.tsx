@@ -17,7 +17,6 @@ import {
   getAssetsByProject,
   type AssetWithPromptRun,
 } from './services/assetService'
-import { getProjects, type Project } from './services/projectService'
 import {
   getCharactersByProject,
   type CharacterWithWorldview,
@@ -30,6 +29,10 @@ import {
   getLocationsByProject,
   type LocationWithWorldview,
 } from './services/locationService'
+import {
+  getProjects,
+  type Project,
+} from './services/projectService'
 import {
   getPromptRunsByProject,
   type PromptRunWithDetails,
@@ -234,8 +237,10 @@ function App() {
       {activeSection === 'promptRuns' && (
         <PromptRunsSection
           promptRuns={promptRuns}
+          assets={assets}
           isLoadingPromptRuns={isLoadingPromptRuns}
           errorMessage={errorMessage}
+          onAssetStatusChanged={loadAssets}
         />
       )}
 
@@ -286,20 +291,16 @@ function PageIntro({ activeSection }: PageIntroProps) {
       'Eternal Rift 캐릭터 목록과 선택한 캐릭터의 상세 설정을 확인합니다.',
     worldviews:
       'Eternal Rift 세계관 규칙, 문명 수준, 시각 톤, 프롬프트 요약을 확인합니다.',
-    locations:
-      'Eternal Rift 장소와 배경 프롬프트 데이터를 확인합니다.',
-    factions:
-      'Eternal Rift 세력, 조직, 문명 정보를 확인합니다.',
-    relationships:
-      'Eternal Rift 캐릭터 간 관계, 감정선, 갈등 구조를 확인합니다.',
+    locations: 'Eternal Rift 장소와 배경 프롬프트 데이터를 확인합니다.',
+    factions: 'Eternal Rift 세력, 조직, 문명 정보를 확인합니다.',
+    relationships: 'Eternal Rift 캐릭터 간 관계, 감정선, 갈등 구조를 확인합니다.',
     promptBuilder:
       '캐릭터/장소/장면 데이터, 스타일 가이드, 프롬프트 템플릿을 조합해 Google Flow용 최종 프롬프트를 생성하고 실행 기록으로 저장합니다.',
     promptRuns:
-      'Prompt Builder에서 저장한 프롬프트 실행 기록과 입력 스냅샷을 확인합니다.',
+      'Prompt Builder에서 저장한 프롬프트 실행 기록과 연결된 Asset 후보를 비교합니다.',
     assets:
       'Google Flow 생성 결과 이미지와 영상 후보를 등록하고 prompt run과 연결합니다.',
-    promptTemplates:
-      'Google Flow용 프롬프트 템플릿과 변수를 확인합니다.',
+    promptTemplates: 'Google Flow용 프롬프트 템플릿과 변수를 확인합니다.',
   }
 
   return (
@@ -363,23 +364,16 @@ function OverviewSection({
       </section>
 
       <section className="mt-8">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-semibold">Projects</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Story IP 프로젝트 기본 정보
-            </p>
-          </div>
-        </div>
+        <SectionHeader
+          title="Projects"
+          description="Story IP 프로젝트 기본 정보"
+          countLabel={`${projects.length} projects`}
+        />
 
-        {isLoadingProjects && (
-          <p className="text-slate-400">Loading projects...</p>
-        )}
+        {isLoadingProjects && <p className="text-slate-400">Loading projects...</p>}
 
         {!isLoadingProjects && !errorMessage && projects.length === 0 && (
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-5 text-slate-300">
-            조회된 프로젝트가 없습니다.
-          </div>
+          <EmptyState>조회된 프로젝트가 없습니다.</EmptyState>
         )}
 
         <div className="grid gap-4">
@@ -590,21 +584,48 @@ function RelationshipsSection({
 
 type PromptRunsSectionProps = {
   promptRuns: PromptRunWithDetails[]
+  assets: AssetWithPromptRun[]
   isLoadingPromptRuns: boolean
   errorMessage: string | null
+  onAssetStatusChanged: () => void
 }
 
 function PromptRunsSection({
   promptRuns,
+  assets,
   isLoadingPromptRuns,
   errorMessage,
+  onAssetStatusChanged,
 }: PromptRunsSectionProps) {
+  const assetsByPromptRunId = useMemo(
+    () =>
+      assets.reduce<Record<string, AssetWithPromptRun[]>>((groupedAssets, asset) => {
+        if (!asset.prompt_run_id) {
+          return groupedAssets
+        }
+
+        return {
+          ...groupedAssets,
+          [asset.prompt_run_id]: [
+            ...(groupedAssets[asset.prompt_run_id] ?? []),
+            asset,
+          ],
+        }
+      }, {}),
+    [assets],
+  )
+
+  const linkedAssetCount = Object.values(assetsByPromptRunId).reduce(
+    (total, runAssets) => total + runAssets.length,
+    0,
+  )
+
   return (
     <section className="mt-8">
       <SectionHeader
         title="Prompt Runs"
-        description="Prompt Builder에서 저장한 프롬프트 실행 기록"
-        countLabel={`${promptRuns.length} runs`}
+        description="Prompt Builder에서 저장한 프롬프트 실행 기록과 연결 Asset 후보"
+        countLabel={`${promptRuns.length} runs · ${linkedAssetCount} linked assets`}
       />
 
       {isLoadingPromptRuns && (
@@ -617,7 +638,12 @@ function PromptRunsSection({
 
       <div className="grid gap-5">
         {promptRuns.map((promptRun) => (
-          <PromptRunCard key={promptRun.id} promptRun={promptRun} />
+          <PromptRunCard
+            key={promptRun.id}
+            promptRun={promptRun}
+            assets={assetsByPromptRunId[promptRun.id] ?? []}
+            onAssetStatusChanged={onAssetStatusChanged}
+          />
         ))}
       </div>
     </section>
