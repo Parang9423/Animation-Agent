@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AssetCard } from './components/assets/AssetCard'
 import { AssetCreateForm } from './components/assets/AssetCreateForm'
 import { CharacterCard } from './components/characters/CharacterCard'
@@ -97,106 +97,54 @@ function App() {
 
   useEffect(() => {
     getProjects()
-      .then((data) => {
-        setProjects(data)
-      })
-      .catch((error) => {
-        setErrorMessage(error.message)
-      })
-      .finally(() => {
-        setIsLoadingProjects(false)
-      })
+      .then((data) => setProjects(data))
+      .catch((error) => setErrorMessage(error.message))
+      .finally(() => setIsLoadingProjects(false))
 
     getCharactersByProject(ETERNAL_RIFT_PROJECT_ID)
       .then((data) => {
         setCharacters(data)
         setSelectedCharacter(data[0] ?? null)
       })
-      .catch((error) => {
-        setErrorMessage(error.message)
-      })
-      .finally(() => {
-        setIsLoadingCharacters(false)
-      })
+      .catch((error) => setErrorMessage(error.message))
+      .finally(() => setIsLoadingCharacters(false))
 
     getWorldviewsByProject(ETERNAL_RIFT_PROJECT_ID)
-      .then((data) => {
-        setWorldviews(data)
-      })
-      .catch((error) => {
-        setErrorMessage(error.message)
-      })
-      .finally(() => {
-        setIsLoadingWorldviews(false)
-      })
+      .then((data) => setWorldviews(data))
+      .catch((error) => setErrorMessage(error.message))
+      .finally(() => setIsLoadingWorldviews(false))
 
     getLocationsByProject(ETERNAL_RIFT_PROJECT_ID)
-      .then((data) => {
-        setLocations(data)
-      })
-      .catch((error) => {
-        setErrorMessage(error.message)
-      })
-      .finally(() => {
-        setIsLoadingLocations(false)
-      })
+      .then((data) => setLocations(data))
+      .catch((error) => setErrorMessage(error.message))
+      .finally(() => setIsLoadingLocations(false))
 
     getFactionsByProject(ETERNAL_RIFT_PROJECT_ID)
-      .then((data) => {
-        setFactions(data)
-      })
-      .catch((error) => {
-        setErrorMessage(error.message)
-      })
-      .finally(() => {
-        setIsLoadingFactions(false)
-      })
+      .then((data) => setFactions(data))
+      .catch((error) => setErrorMessage(error.message))
+      .finally(() => setIsLoadingFactions(false))
 
     getRelationshipsByProject(ETERNAL_RIFT_PROJECT_ID)
-      .then((data) => {
-        setRelationships(data)
-      })
-      .catch((error) => {
-        setErrorMessage(error.message)
-      })
-      .finally(() => {
-        setIsLoadingRelationships(false)
-      })
+      .then((data) => setRelationships(data))
+      .catch((error) => setErrorMessage(error.message))
+      .finally(() => setIsLoadingRelationships(false))
 
     getPromptTemplatesByProject(ETERNAL_RIFT_PROJECT_ID)
-      .then((data) => {
-        setPromptTemplates(data)
-      })
-      .catch((error) => {
-        setErrorMessage(error.message)
-      })
-      .finally(() => {
-        setIsLoadingPromptTemplates(false)
-      })
+      .then((data) => setPromptTemplates(data))
+      .catch((error) => setErrorMessage(error.message))
+      .finally(() => setIsLoadingPromptTemplates(false))
 
     getPromptRunsByProject(ETERNAL_RIFT_PROJECT_ID)
-      .then((data) => {
-        setPromptRuns(data)
-      })
-      .catch((error) => {
-        setErrorMessage(error.message)
-      })
-      .finally(() => {
-        setIsLoadingPromptRuns(false)
-      })
+      .then((data) => setPromptRuns(data))
+      .catch((error) => setErrorMessage(error.message))
+      .finally(() => setIsLoadingPromptRuns(false))
 
     loadAssets()
 
     getStyleGuidesByProject(ETERNAL_RIFT_PROJECT_ID)
-      .then((data) => {
-        setStyleGuides(data)
-      })
-      .catch((error) => {
-        setErrorMessage(error.message)
-      })
-      .finally(() => {
-        setIsLoadingStyleGuides(false)
-      })
+      .then((data) => setStyleGuides(data))
+      .catch((error) => setErrorMessage(error.message))
+      .finally(() => setIsLoadingStyleGuides(false))
   }, [])
 
   return (
@@ -359,11 +307,9 @@ function PageIntro({ activeSection }: PageIntroProps) {
       <p className="text-sm font-medium uppercase tracking-[0.3em] text-cyan-400">
         Animation Agent
       </p>
-
       <h1 className="mt-3 text-4xl font-bold">
         {sectionTitleMap[activeSection]}
       </h1>
-
       <p className="mt-3 text-slate-400">
         {sectionDescriptionMap[activeSection]}
       </p>
@@ -463,27 +409,18 @@ function CharactersSection({
 }: CharactersSectionProps) {
   return (
     <section className="mt-8">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold">Characters</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Eternal Rift 주요 캐릭터 목록
-          </p>
-        </div>
-
-        <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-sm text-slate-300">
-          {characters.length} characters
-        </span>
-      </div>
+      <SectionHeader
+        title="Characters"
+        description="Eternal Rift 주요 캐릭터 목록"
+        countLabel={`${characters.length} characters`}
+      />
 
       {isLoadingCharacters && (
         <p className="text-slate-400">Loading characters...</p>
       )}
 
       {!isLoadingCharacters && !errorMessage && characters.length === 0 && (
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-5 text-slate-300">
-          조회된 캐릭터가 없습니다.
-        </div>
+        <EmptyState>조회된 캐릭터가 없습니다.</EmptyState>
       )}
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -517,27 +454,18 @@ function WorldviewsSection({
 }: WorldviewsSectionProps) {
   return (
     <section className="mt-8">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold">Worldviews</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Eternal Rift 세계관 목록
-          </p>
-        </div>
-
-        <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-sm text-slate-300">
-          {worldviews.length} worldviews
-        </span>
-      </div>
+      <SectionHeader
+        title="Worldviews"
+        description="Eternal Rift 세계관 목록"
+        countLabel={`${worldviews.length} worldviews`}
+      />
 
       {isLoadingWorldviews && (
         <p className="text-slate-400">Loading worldviews...</p>
       )}
 
       {!isLoadingWorldviews && !errorMessage && worldviews.length === 0 && (
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-5 text-slate-300">
-          조회된 세계관이 없습니다.
-        </div>
+        <EmptyState>조회된 세계관이 없습니다.</EmptyState>
       )}
 
       <div className="grid gap-5">
@@ -562,27 +490,18 @@ function LocationsSection({
 }: LocationsSectionProps) {
   return (
     <section className="mt-8">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold">Locations</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Eternal Rift 장소와 배경 목록
-          </p>
-        </div>
-
-        <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-sm text-slate-300">
-          {locations.length} locations
-        </span>
-      </div>
+      <SectionHeader
+        title="Locations"
+        description="Eternal Rift 장소와 배경 목록"
+        countLabel={`${locations.length} locations`}
+      />
 
       {isLoadingLocations && (
         <p className="text-slate-400">Loading locations...</p>
       )}
 
       {!isLoadingLocations && !errorMessage && locations.length === 0 && (
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-5 text-slate-300">
-          조회된 장소가 없습니다.
-        </div>
+        <EmptyState>조회된 장소가 없습니다.</EmptyState>
       )}
 
       <div className="grid gap-5">
@@ -607,27 +526,18 @@ function FactionsSection({
 }: FactionsSectionProps) {
   return (
     <section className="mt-8">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold">Factions</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Eternal Rift 세력과 문명 목록
-          </p>
-        </div>
-
-        <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-sm text-slate-300">
-          {factions.length} factions
-        </span>
-      </div>
+      <SectionHeader
+        title="Factions"
+        description="Eternal Rift 세력과 문명 목록"
+        countLabel={`${factions.length} factions`}
+      />
 
       {isLoadingFactions && (
         <p className="text-slate-400">Loading factions...</p>
       )}
 
       {!isLoadingFactions && !errorMessage && factions.length === 0 && (
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-5 text-slate-300">
-          조회된 세력이 없습니다.
-        </div>
+        <EmptyState>조회된 세력이 없습니다.</EmptyState>
       )}
 
       <div className="grid gap-5">
@@ -652,27 +562,18 @@ function RelationshipsSection({
 }: RelationshipsSectionProps) {
   return (
     <section className="mt-8">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold">Relationships</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Eternal Rift 캐릭터 관계와 갈등 구조
-          </p>
-        </div>
-
-        <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-sm text-slate-300">
-          {relationships.length} relationships
-        </span>
-      </div>
+      <SectionHeader
+        title="Relationships"
+        description="Eternal Rift 캐릭터 관계와 갈등 구조"
+        countLabel={`${relationships.length} relationships`}
+      />
 
       {isLoadingRelationships && (
         <p className="text-slate-400">Loading relationships...</p>
       )}
 
       {!isLoadingRelationships && !errorMessage && relationships.length === 0 && (
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-5 text-slate-300">
-          조회된 관계가 없습니다.
-        </div>
+        <EmptyState>조회된 관계가 없습니다.</EmptyState>
       )}
 
       <div className="grid gap-5">
@@ -700,27 +601,18 @@ function PromptRunsSection({
 }: PromptRunsSectionProps) {
   return (
     <section className="mt-8">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold">Prompt Runs</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Prompt Builder에서 저장한 프롬프트 실행 기록
-          </p>
-        </div>
-
-        <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-sm text-slate-300">
-          {promptRuns.length} runs
-        </span>
-      </div>
+      <SectionHeader
+        title="Prompt Runs"
+        description="Prompt Builder에서 저장한 프롬프트 실행 기록"
+        countLabel={`${promptRuns.length} runs`}
+      />
 
       {isLoadingPromptRuns && (
         <p className="text-slate-400">Loading prompt runs...</p>
       )}
 
       {!isLoadingPromptRuns && !errorMessage && promptRuns.length === 0 && (
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-5 text-slate-300">
-          저장된 Prompt Run이 없습니다.
-        </div>
+        <EmptyState>저장된 Prompt Run이 없습니다.</EmptyState>
       )}
 
       <div className="grid gap-5">
@@ -731,6 +623,9 @@ function PromptRunsSection({
     </section>
   )
 }
+
+type AssetFilterValue = 'all' | string
+type PromptRunLinkFilter = 'all' | 'linked' | 'unlinked'
 
 type AssetsSectionProps = {
   projectId: string
@@ -749,20 +644,69 @@ function AssetsSection({
   errorMessage,
   onAssetCreated,
 }: AssetsSectionProps) {
+  const [statusFilter, setStatusFilter] = useState<AssetFilterValue>('all')
+  const [assetTypeFilter, setAssetTypeFilter] = useState<AssetFilterValue>('all')
+  const [sourceTypeFilter, setSourceTypeFilter] = useState<AssetFilterValue>('all')
+  const [promptRunLinkFilter, setPromptRunLinkFilter] =
+    useState<PromptRunLinkFilter>('all')
+
+  const assetTypeOptions = useMemo(
+    () => buildStringOptions(assets.map((asset) => asset.asset_type)),
+    [assets],
+  )
+  const sourceTypeOptions = useMemo(
+    () => buildStringOptions(assets.map((asset) => asset.source_type)),
+    [assets],
+  )
+  const statusOptions = useMemo(
+    () => buildStringOptions(assets.map((asset) => asset.status)),
+    [assets],
+  )
+
+  const filteredAssets = useMemo(
+    () =>
+      assets.filter((asset) => {
+        const matchesStatus =
+          statusFilter === 'all' || asset.status === statusFilter
+        const matchesAssetType =
+          assetTypeFilter === 'all' || asset.asset_type === assetTypeFilter
+        const matchesSourceType =
+          sourceTypeFilter === 'all' || asset.source_type === sourceTypeFilter
+        const matchesPromptRunLink =
+          promptRunLinkFilter === 'all' ||
+          (promptRunLinkFilter === 'linked' && Boolean(asset.prompt_run_id)) ||
+          (promptRunLinkFilter === 'unlinked' && !asset.prompt_run_id)
+
+        return (
+          matchesStatus &&
+          matchesAssetType &&
+          matchesSourceType &&
+          matchesPromptRunLink
+        )
+      }),
+    [
+      assets,
+      assetTypeFilter,
+      promptRunLinkFilter,
+      sourceTypeFilter,
+      statusFilter,
+    ],
+  )
+
+  const resetFilters = () => {
+    setStatusFilter('all')
+    setAssetTypeFilter('all')
+    setSourceTypeFilter('all')
+    setPromptRunLinkFilter('all')
+  }
+
   return (
     <section className="mt-8">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold">Assets</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Google Flow 생성 결과와 외부 산출물을 prompt run에 연결합니다.
-          </p>
-        </div>
-
-        <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-sm text-slate-300">
-          {assets.length} assets
-        </span>
-      </div>
+      <SectionHeader
+        title="Assets"
+        description="Google Flow 생성 결과와 외부 산출물을 prompt run에 연결합니다."
+        countLabel={`${filteredAssets.length} / ${assets.length} assets`}
+      />
 
       <AssetCreateForm
         projectId={projectId}
@@ -770,23 +714,116 @@ function AssetsSection({
         onCreated={onAssetCreated}
       />
 
+      <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-100">Asset Filters</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              상태, 유형, 출처, prompt_run 연결 여부로 Asset 목록을 필터링합니다.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:border-cyan-700 hover:text-cyan-100"
+          >
+            Reset Filters
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-4">
+          <FilterSelect
+            label="Status"
+            value={statusFilter}
+            options={statusOptions}
+            onChange={setStatusFilter}
+          />
+          <FilterSelect
+            label="Asset Type"
+            value={assetTypeFilter}
+            options={assetTypeOptions}
+            onChange={setAssetTypeFilter}
+          />
+          <FilterSelect
+            label="Source Type"
+            value={sourceTypeFilter}
+            options={sourceTypeOptions}
+            onChange={setSourceTypeFilter}
+          />
+          <label className="block">
+            <span className="text-sm text-slate-400">Prompt Run Link</span>
+            <select
+              value={promptRunLinkFilter}
+              onChange={(event) =>
+                setPromptRunLinkFilter(event.target.value as PromptRunLinkFilter)
+              }
+              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
+            >
+              <option value="all">all</option>
+              <option value="linked">linked</option>
+              <option value="unlinked">unlinked</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
       <div className="mt-8">
         {isLoadingAssets && <p className="text-slate-400">Loading assets...</p>}
 
         {!isLoadingAssets && !errorMessage && assets.length === 0 && (
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-5 text-slate-300">
-            등록된 Asset이 없습니다.
-          </div>
+          <EmptyState>등록된 Asset이 없습니다.</EmptyState>
         )}
 
+        {!isLoadingAssets &&
+          !errorMessage &&
+          assets.length > 0 &&
+          filteredAssets.length === 0 && (
+            <EmptyState>현재 필터 조건에 맞는 Asset이 없습니다.</EmptyState>
+          )}
+
         <div className="grid gap-5">
-          {assets.map((asset) => (
+          {filteredAssets.map((asset) => (
             <AssetCard key={asset.id} asset={asset} />
           ))}
         </div>
       </div>
     </section>
   )
+}
+
+type FilterSelectProps = {
+  label: string
+  value: string
+  options: string[]
+  onChange: (value: string) => void
+}
+
+function FilterSelect({ label, value, options, onChange }: FilterSelectProps) {
+  return (
+    <label className="block">
+      <span className="text-sm text-slate-400">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+function buildStringOptions(values: Array<string | null>) {
+  const uniqueValues = Array.from(
+    new Set(values.filter((value): value is string => Boolean(value))),
+  ).sort((firstValue, secondValue) => firstValue.localeCompare(secondValue))
+
+  return ['all', ...uniqueValues]
 }
 
 type PromptTemplatesSectionProps = {
@@ -802,27 +839,18 @@ function PromptTemplatesSection({
 }: PromptTemplatesSectionProps) {
   return (
     <section className="mt-8">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold">Prompt Templates</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Google Flow용 프롬프트 템플릿 목록
-          </p>
-        </div>
-
-        <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-sm text-slate-300">
-          {promptTemplates.length} templates
-        </span>
-      </div>
+      <SectionHeader
+        title="Prompt Templates"
+        description="Google Flow용 프롬프트 템플릿 목록"
+        countLabel={`${promptTemplates.length} templates`}
+      />
 
       {isLoadingPromptTemplates && (
         <p className="text-slate-400">Loading prompt templates...</p>
       )}
 
       {!isLoadingPromptTemplates && !errorMessage && promptTemplates.length === 0 && (
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-5 text-slate-300">
-          조회된 프롬프트 템플릿이 없습니다.
-        </div>
+        <EmptyState>조회된 프롬프트 템플릿이 없습니다.</EmptyState>
       )}
 
       <div className="grid gap-5">
@@ -834,6 +862,39 @@ function PromptTemplatesSection({
         ))}
       </div>
     </section>
+  )
+}
+
+type SectionHeaderProps = {
+  title: string
+  description: string
+  countLabel: string
+}
+
+function SectionHeader({ title, description, countLabel }: SectionHeaderProps) {
+  return (
+    <div className="mb-4 flex items-center justify-between">
+      <div>
+        <h2 className="text-2xl font-semibold">{title}</h2>
+        <p className="mt-1 text-sm text-slate-500">{description}</p>
+      </div>
+
+      <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-sm text-slate-300">
+        {countLabel}
+      </span>
+    </div>
+  )
+}
+
+type EmptyStateProps = {
+  children: string
+}
+
+function EmptyState({ children }: EmptyStateProps) {
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900 p-5 text-slate-300">
+      {children}
+    </div>
   )
 }
 
