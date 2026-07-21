@@ -172,7 +172,6 @@
     top: -4.5px;
     border: 5px solid transparent;
   }
-
   &::before {
     left: 0;
     border-left-color: var(--border);
@@ -181,4 +180,30 @@
     right: 0;
     border-right-color: var(--border);
   }
+}
+
+/* Overview summary cards
+   The overview grid previously forced 11 cards into one row at xl width.
+   That made labels and string values overflow on medium desktop screens. */
+section[class*='xl:grid-cols-11'] {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+}
+
+section[class*='xl:grid-cols-11'] > div {
+  min-height: 9rem;
+  overflow: hidden;
+}
+
+section[class*='xl:grid-cols-11'] > div > p:first-child {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+section[class*='xl:grid-cols-11'] > div > p:last-child {
+  font-size: clamp(1.875rem, 3vw, 2.75rem);
+  line-height: 1.05;
+  overflow-wrap: anywhere;
 }
