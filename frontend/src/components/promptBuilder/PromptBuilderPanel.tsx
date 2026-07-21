@@ -15,10 +15,10 @@ type PromptBuilderPanelProps = {
   promptTemplates: PromptTemplate[]
   styleGuides: StyleGuide[]
   isLoadingStyleGuides: boolean
+  onPromptRunCreated?: () => void
 }
 
 type BuilderMode = 'character' | 'location' | 'scene'
-
 type CopyTarget = 'positive' | 'negative'
 
 type CopyStatus = {
@@ -43,14 +43,17 @@ type ScenePromptFields = {
 }
 
 const DEFAULT_SCENE_FIELDS: ScenePromptFields = {
-  action: 'The character pauses in the scene, confronting a hidden truth connected to the location.',
+  action:
+    'The character pauses in the scene, confronting a hidden truth connected to the location.',
   emotion: 'quiet shock, restrained fear, tragic curiosity',
   camera_shot: 'wide cinematic shot',
   camera_angle: 'slightly low angle',
   lighting: 'cold blue backlight with soft volumetric fog',
   time_weather: 'night, frozen air, drifting snow',
-  additional_notes: 'Focus on environmental storytelling, emotional restraint, and strong silhouette composition.',
-  negative_notes: 'no inconsistent character design, no location mismatch, no comedic tone, no bright cheerful colors, no low-detail background',
+  additional_notes:
+    'Focus on environmental storytelling, emotional restraint, and strong silhouette composition.',
+  negative_notes:
+    'no inconsistent character design, no location mismatch, no comedic tone, no bright cheerful colors, no low-detail background',
 }
 
 export function PromptBuilderPanel({
@@ -60,6 +63,7 @@ export function PromptBuilderPanel({
   promptTemplates,
   styleGuides,
   isLoadingStyleGuides,
+  onPromptRunCreated,
 }: PromptBuilderPanelProps) {
   const [builderMode, setBuilderMode] = useState<BuilderMode>('character')
   const [selectedCharacterId, setSelectedCharacterId] = useState('')
@@ -113,20 +117,16 @@ export function PromptBuilderPanel({
     if (!selectedStyleGuideId && styleGuides.length > 0) {
       const defaultStyleGuide =
         styleGuides.find((styleGuide) => styleGuide.is_default) ?? styleGuides[0]
-
       setSelectedStyleGuideId(defaultStyleGuide.id)
     }
   }, [selectedStyleGuideId, styleGuides])
 
   const selectedCharacter =
     characters.find((character) => character.id === selectedCharacterId) ?? null
-
   const selectedLocation =
     locations.find((location) => location.id === selectedLocationId) ?? null
-
   const selectedTemplate =
     currentTemplates.find((template) => template.id === selectedTemplateId) ?? null
-
   const selectedStyleGuide =
     styleGuides.find((styleGuide) => styleGuide.id === selectedStyleGuideId) ?? null
 
@@ -136,10 +136,7 @@ export function PromptBuilderPanel({
     }
 
     if (builderMode === 'character') {
-      if (!selectedCharacter) {
-        return ''
-      }
-
+      if (!selectedCharacter) return ''
       return buildPromptFromTemplate(
         selectedTemplate.template_body,
         buildCharacterPromptValues(selectedCharacter, selectedStyleGuide),
@@ -147,10 +144,7 @@ export function PromptBuilderPanel({
     }
 
     if (builderMode === 'location') {
-      if (!selectedLocation) {
-        return ''
-      }
-
+      if (!selectedLocation) return ''
       return buildPromptFromTemplate(
         selectedTemplate.template_body,
         buildLocationPromptValues(selectedLocation, selectedStyleGuide),
@@ -224,9 +218,7 @@ export function PromptBuilderPanel({
   }
 
   const handleCopy = async (target: CopyTarget, prompt: string) => {
-    if (!prompt) {
-      return
-    }
+    if (!prompt) return
 
     try {
       await navigator.clipboard.writeText(prompt)
@@ -311,6 +303,12 @@ export function PromptBuilderPanel({
         status: 'saved',
         message: `Saved prompt run: ${promptRun.id.slice(0, 8)}`,
       })
+
+      if (onPromptRunCreated) {
+        onPromptRunCreated()
+      } else {
+        window.setTimeout(() => window.location.reload(), 700)
+      }
     } catch (error) {
       setSaveStatus({
         status: 'failed',
@@ -331,7 +329,6 @@ export function PromptBuilderPanel({
             캐릭터/장소/장면 데이터, 스타일 가이드, Google Flow 템플릿을 조합해 최종 프롬프트를 생성합니다.
           </p>
         </div>
-
         <span className="rounded-full border border-cyan-700 bg-cyan-950 px-3 py-1 text-sm text-cyan-200">
           {builderMode} MVP
         </span>
@@ -341,207 +338,73 @@ export function PromptBuilderPanel({
         <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-lg shadow-black/20">
           <p className="text-sm font-semibold text-slate-300">Builder Settings</p>
 
-          <label className="mt-5 block">
-            <span className="text-sm text-slate-400">Template Type</span>
-            <select
-              value={builderMode}
-              onChange={(event) => setBuilderMode(event.target.value as BuilderMode)}
-              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
-            >
-              <option value="character">character</option>
-              <option value="location">location</option>
-              <option value="scene">scene</option>
-            </select>
-          </label>
+          <SelectField
+            label="Template Type"
+            value={builderMode}
+            options={['character', 'location', 'scene']}
+            onChange={(value) => setBuilderMode(value as BuilderMode)}
+          />
 
           {(builderMode === 'character' || builderMode === 'scene') && (
-            <label className="mt-5 block">
-              <span className="text-sm text-slate-400">Character</span>
-              <select
-                value={selectedCharacterId}
-                onChange={(event) => setSelectedCharacterId(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
-              >
-                {characters.map((character) => (
-                  <option key={character.id} value={character.id}>
-                    {character.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <SelectField
+              label="Character"
+              value={selectedCharacterId}
+              options={characters.map((character) => character.id)}
+              optionLabels={Object.fromEntries(
+                characters.map((character) => [character.id, character.name]),
+              )}
+              onChange={setSelectedCharacterId}
+            />
           )}
 
           {(builderMode === 'location' || builderMode === 'scene') && (
-            <label className="mt-5 block">
-              <span className="text-sm text-slate-400">Location</span>
-              <select
-                value={selectedLocationId}
-                onChange={(event) => setSelectedLocationId(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
-              >
-                {locations.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {location.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <SelectField
+              label="Location"
+              value={selectedLocationId}
+              options={locations.map((location) => location.id)}
+              optionLabels={Object.fromEntries(
+                locations.map((location) => [location.id, location.name]),
+              )}
+              onChange={setSelectedLocationId}
+            />
           )}
 
-          <label className="mt-5 block">
-            <span className="text-sm text-slate-400">Style Guide</span>
-            <select
-              value={selectedStyleGuideId}
-              onChange={(event) => setSelectedStyleGuideId(event.target.value)}
-              disabled={isLoadingStyleGuides || styleGuides.length === 0}
-              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500 disabled:cursor-not-allowed disabled:text-slate-600"
-            >
-              {isLoadingStyleGuides && <option>Loading style guides...</option>}
-              {!isLoadingStyleGuides && styleGuides.length === 0 && (
-                <option>No style guides</option>
-              )}
-              {styleGuides.map((styleGuide) => (
-                <option key={styleGuide.id} value={styleGuide.id}>
-                  {styleGuide.name}
-                  {styleGuide.is_default ? ' (default)' : ''}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SelectField
+            label="Style Guide"
+            value={selectedStyleGuideId}
+            options={styleGuides.map((styleGuide) => styleGuide.id)}
+            optionLabels={Object.fromEntries(
+              styleGuides.map((styleGuide) => [
+                styleGuide.id,
+                `${styleGuide.name}${styleGuide.is_default ? ' (default)' : ''}`,
+              ]),
+            )}
+            onChange={setSelectedStyleGuideId}
+            disabled={isLoadingStyleGuides || styleGuides.length === 0}
+            emptyLabel={isLoadingStyleGuides ? 'Loading style guides...' : 'No style guides'}
+          />
 
-          <label className="mt-5 block">
-            <span className="text-sm text-slate-400">Prompt Template</span>
-            <select
-              value={selectedTemplateId}
-              onChange={(event) => setSelectedTemplateId(event.target.value)}
-              disabled={currentTemplates.length === 0}
-              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500 disabled:cursor-not-allowed disabled:text-slate-600"
-            >
-              {currentTemplates.length === 0 && <option>No templates</option>}
-              {currentTemplates.map((template) => (
-                <option key={template.id} value={template.id}>
-                  {template.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SelectField
+            label="Prompt Template"
+            value={selectedTemplateId}
+            options={currentTemplates.map((template) => template.id)}
+            optionLabels={Object.fromEntries(
+              currentTemplates.map((template) => [template.id, template.name]),
+            )}
+            onChange={setSelectedTemplateId}
+            disabled={currentTemplates.length === 0}
+            emptyLabel="No templates"
+          />
 
           {builderMode === 'scene' && (
-            <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4">
-              <p className="text-sm font-semibold text-slate-300">
-                Scene Direction
-              </p>
-
-              <label className="mt-4 block">
-                <span className="text-xs text-slate-500">Scene Action</span>
-                <textarea
-                  value={sceneFields.action}
-                  onChange={(event) =>
-                    handleSceneFieldChange('action', event.target.value)
-                  }
-                  rows={3}
-                  className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm leading-6 text-slate-200 outline-none focus:border-cyan-500"
-                />
-              </label>
-
-              <label className="mt-4 block">
-                <span className="text-xs text-slate-500">Scene Emotion</span>
-                <input
-                  value={sceneFields.emotion}
-                  onChange={(event) =>
-                    handleSceneFieldChange('emotion', event.target.value)
-                  }
-                  className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
-                />
-              </label>
-
-              <label className="mt-4 block">
-                <span className="text-xs text-slate-500">Camera Shot</span>
-                <select
-                  value={sceneFields.camera_shot}
-                  onChange={(event) =>
-                    handleSceneFieldChange('camera_shot', event.target.value)
-                  }
-                  className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
-                >
-                  <option value="wide cinematic shot">wide cinematic shot</option>
-                  <option value="medium shot">medium shot</option>
-                  <option value="close-up shot">close-up shot</option>
-                  <option value="establishing shot">establishing shot</option>
-                  <option value="over-the-shoulder shot">over-the-shoulder shot</option>
-                </select>
-              </label>
-
-              <label className="mt-4 block">
-                <span className="text-xs text-slate-500">Camera Angle</span>
-                <select
-                  value={sceneFields.camera_angle}
-                  onChange={(event) =>
-                    handleSceneFieldChange('camera_angle', event.target.value)
-                  }
-                  className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
-                >
-                  <option value="eye level">eye level</option>
-                  <option value="slightly low angle">slightly low angle</option>
-                  <option value="low angle">low angle</option>
-                  <option value="high angle">high angle</option>
-                  <option value="side view">side view</option>
-                  <option value="Dutch angle">Dutch angle</option>
-                </select>
-              </label>
-
-              <label className="mt-4 block">
-                <span className="text-xs text-slate-500">Lighting</span>
-                <input
-                  value={sceneFields.lighting}
-                  onChange={(event) =>
-                    handleSceneFieldChange('lighting', event.target.value)
-                  }
-                  className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
-                />
-              </label>
-
-              <label className="mt-4 block">
-                <span className="text-xs text-slate-500">Time / Weather</span>
-                <input
-                  value={sceneFields.time_weather}
-                  onChange={(event) =>
-                    handleSceneFieldChange('time_weather', event.target.value)
-                  }
-                  className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
-                />
-              </label>
-
-              <label className="mt-4 block">
-                <span className="text-xs text-slate-500">Additional Notes</span>
-                <textarea
-                  value={sceneFields.additional_notes}
-                  onChange={(event) =>
-                    handleSceneFieldChange('additional_notes', event.target.value)
-                  }
-                  rows={3}
-                  className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm leading-6 text-slate-200 outline-none focus:border-cyan-500"
-                />
-              </label>
-
-              <label className="mt-4 block">
-                <span className="text-xs text-slate-500">Scene Negative Notes</span>
-                <textarea
-                  value={sceneFields.negative_notes}
-                  onChange={(event) =>
-                    handleSceneFieldChange('negative_notes', event.target.value)
-                  }
-                  rows={3}
-                  className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm leading-6 text-slate-200 outline-none focus:border-cyan-500"
-                />
-              </label>
-            </div>
+            <SceneDirectionFields
+              sceneFields={sceneFields}
+              onChange={handleSceneFieldChange}
+            />
           )}
 
           <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4">
-            <p className="text-sm font-semibold text-slate-300">
-              Save Prompt Run
-            </p>
+            <p className="text-sm font-semibold text-slate-300">Save Prompt Run</p>
             <p className="mt-2 text-sm leading-6 text-slate-500">
               현재 Positive / Negative Prompt와 선택 데이터를 prompt_runs 테이블에 draft 상태로 저장합니다.
             </p>
@@ -568,87 +431,28 @@ export function PromptBuilderPanel({
             )}
           </div>
 
-          <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4">
-            <p className="text-sm font-semibold text-slate-300">
-              Style Prompt Prefix
-            </p>
-            <p className="mt-3 text-sm leading-6 text-slate-400">
-              {isLoadingStyleGuides
-                ? 'Loading style prompt prefix...'
-                : selectedStyleGuide?.prompt_prefix ?? 'No style prompt prefix'}
-            </p>
-          </div>
+          <InfoPanel
+            title="Selected Data"
+            lines={[
+              `Mode: ${builderMode}`,
+              `Subject: ${selectedSubjectName}`,
+              `Style: ${selectedStyleGuide?.name ?? 'No style guide'}`,
+              `Template: ${selectedTemplate?.name ?? 'No template'}`,
+            ]}
+          />
 
-          <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4">
-            <p className="text-sm font-semibold text-slate-300">
-              Negative Prompt Sources
-            </p>
-            <p className="mt-3 text-sm leading-6 text-slate-400">
-              Character: {selectedCharacter?.negative_prompt ?? 'No character negative prompt'}
-            </p>
-            <p className="mt-3 text-sm leading-6 text-slate-400">
-              Location: {selectedLocation?.negative_prompt ?? 'No location negative prompt'}
-            </p>
-            {builderMode === 'scene' && (
-              <p className="mt-3 text-sm leading-6 text-slate-400">
-                Scene: {sceneFields.negative_notes || 'No scene negative notes'}
-              </p>
-            )}
-            <p className="mt-3 text-sm leading-6 text-slate-400">
-              Style:{' '}
-              {isLoadingStyleGuides
-                ? 'Loading...'
-                : selectedStyleGuide?.negative_style ?? 'No style negative prompt'}
-            </p>
-            <p className="mt-3 text-sm leading-6 text-slate-400">
-              Template: {selectedTemplate?.negative_prompt ?? 'No template negative prompt'}
-            </p>
-          </div>
-
-          <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4">
-            <p className="text-sm font-semibold text-slate-300">
-              Style Details
-            </p>
-            <p className="mt-3 text-sm leading-6 text-slate-400">
-              Animation:{' '}
-              {isLoadingStyleGuides
-                ? 'Loading...'
-                : selectedStyleGuide?.animation_style ?? 'No animation style'}
-            </p>
-            <p className="mt-1 text-sm leading-6 text-slate-400">
-              Lighting:{' '}
-              {isLoadingStyleGuides
-                ? 'Loading...'
-                : selectedStyleGuide?.lighting_style ?? 'No lighting style'}
-            </p>
-            <p className="mt-1 text-sm leading-6 text-slate-400">
-              Mood:{' '}
-              {isLoadingStyleGuides
-                ? 'Loading...'
-                : selectedStyleGuide?.mood ?? 'No mood'}
-            </p>
-          </div>
-
-          <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4">
-            <p className="text-sm font-semibold text-slate-300">
-              Selected Data
-            </p>
-            <p className="mt-3 text-sm leading-6 text-slate-400">
-              Mode: {builderMode}
-            </p>
-            <p className="mt-1 text-sm leading-6 text-slate-400">
-              Subject: {selectedSubjectName}
-            </p>
-            <p className="mt-1 text-sm leading-6 text-slate-400">
-              Style:{' '}
-              {isLoadingStyleGuides
-                ? 'Loading...'
-                : selectedStyleGuide?.name ?? 'No style guide'}
-            </p>
-            <p className="mt-1 text-sm leading-6 text-slate-400">
-              Template: {selectedTemplate?.name ?? 'No template'}
-            </p>
-          </div>
+          <InfoPanel
+            title="Negative Prompt Sources"
+            lines={[
+              `Character: ${selectedCharacter?.negative_prompt ?? 'No character negative prompt'}`,
+              `Location: ${selectedLocation?.negative_prompt ?? 'No location negative prompt'}`,
+              ...(builderMode === 'scene'
+                ? [`Scene: ${sceneFields.negative_notes || 'No scene negative notes'}`]
+                : []),
+              `Style: ${selectedStyleGuide?.negative_style ?? 'No style negative prompt'}`,
+              `Template: ${selectedTemplate?.negative_prompt ?? 'No template negative prompt'}`,
+            ]}
+          />
         </div>
 
         <div className="grid gap-5">
@@ -694,6 +498,164 @@ export function PromptBuilderPanel({
   )
 }
 
+type SelectFieldProps = {
+  label: string
+  value: string
+  options: string[]
+  optionLabels?: Record<string, string>
+  onChange: (value: string) => void
+  disabled?: boolean
+  emptyLabel?: string
+}
+
+function SelectField({
+  label,
+  value,
+  options,
+  optionLabels,
+  onChange,
+  disabled,
+  emptyLabel = 'No options',
+}: SelectFieldProps) {
+  return (
+    <label className="mt-5 block">
+      <span className="text-sm text-slate-400">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={disabled || options.length === 0}
+        className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500 disabled:cursor-not-allowed disabled:text-slate-600"
+      >
+        {options.length === 0 && <option value="">{emptyLabel}</option>}
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {optionLabels?.[option] ?? option}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+type SceneDirectionFieldsProps = {
+  sceneFields: ScenePromptFields
+  onChange: (key: keyof ScenePromptFields, value: string) => void
+}
+
+function SceneDirectionFields({ sceneFields, onChange }: SceneDirectionFieldsProps) {
+  return (
+    <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4">
+      <p className="text-sm font-semibold text-slate-300">Scene Direction</p>
+      <TextAreaField
+        label="Scene Action"
+        value={sceneFields.action}
+        onChange={(value) => onChange('action', value)}
+      />
+      <InputField
+        label="Scene Emotion"
+        value={sceneFields.emotion}
+        onChange={(value) => onChange('emotion', value)}
+      />
+      <SelectField
+        label="Camera Shot"
+        value={sceneFields.camera_shot}
+        options={[
+          'wide cinematic shot',
+          'medium shot',
+          'close-up shot',
+          'establishing shot',
+          'over-the-shoulder shot',
+        ]}
+        onChange={(value) => onChange('camera_shot', value)}
+      />
+      <SelectField
+        label="Camera Angle"
+        value={sceneFields.camera_angle}
+        options={[
+          'eye level',
+          'slightly low angle',
+          'low angle',
+          'high angle',
+          'side view',
+          'Dutch angle',
+        ]}
+        onChange={(value) => onChange('camera_angle', value)}
+      />
+      <InputField
+        label="Lighting"
+        value={sceneFields.lighting}
+        onChange={(value) => onChange('lighting', value)}
+      />
+      <InputField
+        label="Time / Weather"
+        value={sceneFields.time_weather}
+        onChange={(value) => onChange('time_weather', value)}
+      />
+      <TextAreaField
+        label="Additional Notes"
+        value={sceneFields.additional_notes}
+        onChange={(value) => onChange('additional_notes', value)}
+      />
+      <TextAreaField
+        label="Scene Negative Notes"
+        value={sceneFields.negative_notes}
+        onChange={(value) => onChange('negative_notes', value)}
+      />
+    </div>
+  )
+}
+
+type InputFieldProps = {
+  label: string
+  value: string
+  onChange: (value: string) => void
+}
+
+function InputField({ label, value, onChange }: InputFieldProps) {
+  return (
+    <label className="mt-4 block">
+      <span className="text-xs text-slate-500">{label}</span>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
+      />
+    </label>
+  )
+}
+
+function TextAreaField({ label, value, onChange }: InputFieldProps) {
+  return (
+    <label className="mt-4 block">
+      <span className="text-xs text-slate-500">{label}</span>
+      <textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        rows={3}
+        className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm leading-6 text-slate-200 outline-none focus:border-cyan-500"
+      />
+    </label>
+  )
+}
+
+type InfoPanelProps = {
+  title: string
+  lines: string[]
+}
+
+function InfoPanel({ title, lines }: InfoPanelProps) {
+  return (
+    <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4">
+      <p className="text-sm font-semibold text-slate-300">{title}</p>
+      {lines.map((line) => (
+        <p key={line} className="mt-3 text-sm leading-6 text-slate-400">
+          {line}
+        </p>
+      ))}
+    </div>
+  )
+}
+
 type PromptPreviewCardProps = {
   title: string
   description: string
@@ -718,7 +680,6 @@ function PromptPreviewCard({
           <p className="text-sm font-semibold text-slate-300">{title}</p>
           <p className="mt-1 text-xs text-slate-500">{description}</p>
         </div>
-
         <button
           type="button"
           onClick={onCopy}
@@ -728,7 +689,6 @@ function PromptPreviewCard({
           {copyLabel}
         </button>
       </div>
-
       <pre className="mt-5 min-h-[260px] whitespace-pre-wrap break-words rounded-xl border border-cyan-900 bg-cyan-950/20 p-5 text-sm leading-7 text-slate-300">
         {prompt || emptyText}
       </pre>
@@ -741,18 +701,9 @@ function getCopyButtonLabel(
   target: CopyTarget,
   defaultLabel: string,
 ) {
-  if (copyStatus.target !== target) {
-    return defaultLabel
-  }
-
-  if (copyStatus.status === 'copied') {
-    return 'Copied'
-  }
-
-  if (copyStatus.status === 'failed') {
-    return 'Copy Failed'
-  }
-
+  if (copyStatus.target !== target) return defaultLabel
+  if (copyStatus.status === 'copied') return 'Copied'
+  if (copyStatus.status === 'failed') return 'Copy Failed'
   return defaultLabel
 }
 
@@ -761,14 +712,8 @@ function getSelectedSubjectName(
   character: CharacterWithWorldview | null,
   location: LocationWithWorldview | null,
 ) {
-  if (builderMode === 'character') {
-    return character?.name ?? 'No character'
-  }
-
-  if (builderMode === 'location') {
-    return location?.name ?? 'No location'
-  }
-
+  if (builderMode === 'character') return character?.name ?? 'No character'
+  if (builderMode === 'location') return location?.name ?? 'No location'
   return `${character?.name ?? 'No character'} @ ${location?.name ?? 'No location'}`
 }
 
@@ -881,19 +826,13 @@ function buildCharacterPromptValues(
     ...buildStylePromptValues(styleGuide),
     'character.name': character.name,
     'character.role': character.role ?? '',
-    'character.gender': character.gender ?? '',
-    'character.age_range': character.age_range ?? '',
+    'character.age': character.age_text ?? '',
     'character.personality': character.personality ?? '',
-    'character.speech_style': character.speech_style ?? '',
-    'character.appearance': character.appearance ?? '',
-    'character.outfit': character.outfit ?? '',
-    'character.goal': character.goal ?? '',
-    'character.weakness': character.weakness ?? '',
-    'character.backstory': character.backstory ?? '',
-    'character.forbidden_settings': character.forbidden_settings ?? '',
+    'character.visual_description': character.visual_description ?? '',
+    'character.costume': character.costume ?? '',
+    'character.signature_items': character.signature_items?.join(', ') ?? '',
     'character.prompt_summary': character.prompt_summary ?? '',
     'character.negative_prompt': character.negative_prompt ?? '',
-    'character.signature_items': character.signature_items?.join(', ') ?? '',
     'character.worldview': character.worldviews?.name ?? '',
   }
 }
