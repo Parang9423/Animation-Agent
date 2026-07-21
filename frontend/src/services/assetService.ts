@@ -49,6 +49,21 @@ export type CreateAssetInput = {
   prompt_run_id?: string | null
 }
 
+export type UploadAssetFileInput = {
+  file: File
+  projectSlug: string
+  assetType: string
+  promptRunId?: string | null
+}
+
+export type UploadedAssetFile = {
+  bucket: string
+  storage_path: string
+  public_url: string
+}
+
+const ASSET_BUCKET_NAME = 'assets'
+
 export async function getAssetsByProject(
   projectId: string,
 ): Promise<AssetWithPromptRun[]> {
@@ -89,7 +104,7 @@ export async function createAsset(asset: CreateAssetInput): Promise<Asset> {
       project_id: asset.project_id,
       related_entity_type: asset.related_entity_type ?? null,
       related_entity_id: asset.related_entity_id ?? null,
-      asset_type: asset.asset_type ?? 'image',
+      asset_type: asset.asset_type ?? 'other',
       source_type: asset.source_type ?? 'google_flow',
       storage_path: asset.storage_path ?? null,
       external_url: asset.external_url ?? null,
@@ -127,4 +142,72 @@ export async function updateAssetStatus(
   }
 
   return data
+}
+
+export async function uploadAssetFile({
+  file,
+  projectSlug,
+  assetType,
+  promptRunId,
+}: UploadAssetFileInput): Promise<UploadedAssetFile> {
+  const fileExtension = getFileExtension(file.name)
+  const safeBaseName = sanitizeFileName(removeFileExtension(file.name))
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const promptRunPrefix = promptRunId ? `${promptRunId.slice(0, 8)}-` : ''
+  const fileName = `${promptRunPrefix}${safeBaseName}-${timestamp}.${fileExtension}`
+  const storagePath = `${sanitizePathSegment(projectSlug)}/${sanitizePathSegment(
+    assetType,
+  )}/${fileName}`
+
+  const { error } = await supabase.storage
+    .from(ASSET_BUCKET_NAME)
+    .upload(storagePath, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type || undefined,
+    })
+
+  if (error) {
+    throw error
+  }
+
+  const { data } = supabase.storage
+    .from(ASSET_BUCKET_NAME)
+    .getPublicUrl(storagePath)
+
+  return {
+    bucket: ASSET_BUCKET_NAME,
+    storage_path: storagePath,
+    public_url: data.publicUrl,
+  }
+}
+
+function getFileExtension(fileName: string) {
+  const extension = fileName.split('.').pop()?.toLowerCase()
+
+  return extension && extension !== fileName ? extension : 'png'
+}
+
+function removeFileExtension(fileName: string) {
+  return fileName.replace(/\.[^/.]+$/, '')
+}
+
+function sanitizeFileName(fileName: string) {
+  return (
+    fileName
+      .toLowerCase()
+      .replace(/[^a-z0-9가-힣-_]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '') || 'asset'
+  )
+}
+
+function sanitizePathSegment(segment: string) {
+  return (
+    segment
+      .toLowerCase()
+      .replace(/[^a-z0-9-_]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '') || 'default'
+  )
 }
