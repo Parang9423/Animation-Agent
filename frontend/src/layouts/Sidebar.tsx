@@ -7,6 +7,7 @@ export type AppSection =
   | 'relationships'
   | 'promptBuilder'
   | 'promptRuns'
+  | 'assets'
   | 'promptTemplates'
 
 type SidebarProps = {
@@ -60,6 +61,11 @@ const navItems: NavItem[] = [
     id: 'promptRuns',
     label: 'Prompt Runs',
     description: 'Saved generations',
+  },
+  {
+    id: 'assets',
+    label: 'Assets',
+    description: 'Generated outputs',
   },
   {
     id: 'promptTemplates',
