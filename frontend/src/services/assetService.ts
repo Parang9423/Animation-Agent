@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabaseClient'
 
-export type AssetStatus = 'candidate' | 'approved' | 'rejected' | 'archived' | string
+export type AssetStatus = 'candidate' | 'approved' | 'rejected' | 'archived'
 
 export type Asset = {
   id: string
@@ -98,6 +98,27 @@ export async function createAsset(asset: CreateAssetInput): Promise<Asset> {
       status: asset.status ?? 'candidate',
       prompt_run_id: asset.prompt_run_id ?? null,
     })
+    .select('*')
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function updateAssetStatus(
+  assetId: string,
+  status: AssetStatus,
+): Promise<Asset> {
+  const { data, error } = await supabase
+    .from('assets')
+    .update({
+      status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', assetId)
     .select('*')
     .single()
 
