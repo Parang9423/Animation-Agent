@@ -28,6 +28,7 @@ const ASSET_TYPE_OPTIONS = [
   'character_image',
   'location_image',
   'scene_image',
+  'shot_image',
   'video',
   'reference',
   'other',
@@ -110,6 +111,12 @@ export function AssetCreateForm({
       setRelatedEntityId(nextPromptRun.scene_id ?? '')
     }
 
+    if (nextPromptRun.prompt_type === 'shot') {
+      setAssetType('shot_image')
+      setRelatedEntityType('shot')
+      setRelatedEntityId(nextPromptRun.shot_id ?? '')
+    }
+
     setMetadataText(
       JSON.stringify(
         {
@@ -121,6 +128,10 @@ export function AssetCreateForm({
           location_name: nextPromptRun.locations?.name ?? null,
           scene_id: nextPromptRun.scene_id,
           scene_title: nextPromptRun.scenes?.title ?? null,
+          scene_sequence_no: nextPromptRun.scenes?.sequence_no ?? null,
+          shot_id: nextPromptRun.shot_id,
+          shot_title: nextPromptRun.shots?.title ?? null,
+          shot_order: nextPromptRun.shots?.shot_order ?? null,
           selected_candidate: true,
         },
         null,
@@ -334,6 +345,7 @@ export function AssetCreateForm({
             className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-cyan-500"
           >
             <option value="scene">scene</option>
+            <option value="shot">shot</option>
             <option value="character">character</option>
             <option value="location">location</option>
             <option value="project">project</option>
@@ -458,14 +470,17 @@ export function AssetCreateForm({
 }
 
 function getPromptRunLabel(promptRun: PromptRunWithDetails) {
+  const shotTitle = promptRun.shots?.title
   const sceneTitle = promptRun.scenes?.title
   const characterName = promptRun.characters?.name
   const locationName = promptRun.locations?.name
   const subject =
-    sceneTitle ??
-    (characterName && locationName
-      ? `${characterName} @ ${locationName}`
-      : characterName ?? locationName ?? promptRun.prompt_type)
+    shotTitle
+      ? `Shot #${promptRun.shots?.shot_order ?? '-'} ${shotTitle}`
+      : sceneTitle ??
+        (characterName && locationName
+          ? `${characterName} @ ${locationName}`
+          : characterName ?? locationName ?? promptRun.prompt_type)
 
   return `${subject} · ${promptRun.output_status} · ${promptRun.id.slice(0, 8)}`
 }
