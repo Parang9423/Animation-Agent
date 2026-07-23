@@ -1,6 +1,6 @@
 -- Seed shot prompt templates for Eternal Rift.
 -- Run this after supabase/20260723_create_shots_table.sql has been applied.
--- This file matches the current prompt_templates schema.
+-- This file uses only the prompt_templates columns currently used by the app.
 
 insert into public.prompt_templates (
   project_id,
@@ -8,7 +8,6 @@ insert into public.prompt_templates (
   template_type,
   target_tool,
   template_body,
-  required_variables,
   memo
 )
 values
@@ -59,32 +58,6 @@ Negative prompt:
 no inconsistent character design, no changed outfit, no wrong location, no unreadable face, no extra limbs, no distorted hands, no unrelated props, no comedic tone, no bright cheerful color palette, no low-detail background, no text artifacts, no watermark
 
 {{style.prompt_suffix}}',
-  array[
-    'style.prompt_prefix',
-    'style.prompt_suffix',
-    'scene.sequence_no',
-    'scene.title',
-    'scene.scene_type',
-    'scene.prompt_summary',
-    'scene.lighting',
-    'scene.time_weather',
-    'shot.shot_order',
-    'shot.title',
-    'shot.shot_type',
-    'shot.action',
-    'shot.emotion',
-    'shot.dialogue',
-    'shot.camera_shot',
-    'shot.camera_angle',
-    'shot.camera_movement',
-    'shot.visual_prompt',
-    'character.name',
-    'character.role',
-    'character.prompt_summary',
-    'location.name',
-    'location.prompt_summary',
-    'location.atmosphere'
-  ],
   'Shot-level keyframe image prompt template for Google Flow.'
 ),
 (
@@ -137,32 +110,6 @@ Negative prompt:
 no identity drift, no character morphing, no outfit changes, no wrong location, no unstable face, no warped body, no extra limbs, no flickering, no camera jitter, no unreadable action, no text artifacts, no watermark, no abrupt style shift
 
 {{style.prompt_suffix}}',
-  array[
-    'style.prompt_prefix',
-    'style.prompt_suffix',
-    'scene.sequence_no',
-    'scene.title',
-    'scene.prompt_summary',
-    'scene.lighting',
-    'scene.time_weather',
-    'shot.shot_order',
-    'shot.title',
-    'shot.shot_type',
-    'shot.duration_sec',
-    'shot.action',
-    'shot.emotion',
-    'shot.dialogue',
-    'shot.camera_shot',
-    'shot.camera_angle',
-    'shot.camera_movement',
-    'shot.video_prompt',
-    'character.name',
-    'character.role',
-    'character.prompt_summary',
-    'location.name',
-    'location.prompt_summary',
-    'location.atmosphere'
-  ],
   'Shot-level video prompt template for Google Flow or future video generation tools.'
 )
 on conflict do nothing;
