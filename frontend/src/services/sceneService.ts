@@ -140,3 +140,36 @@ export async function createScene(scene: CreateSceneInput): Promise<SceneWithDet
 
   return data
 }
+
+export async function updateSceneStatus(
+  sceneId: string,
+  status: SceneStatus,
+): Promise<SceneWithDetails> {
+  const { data, error } = await supabase
+    .from('scenes')
+    .update({
+      status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', sceneId)
+    .select(
+      `
+      *,
+      characters (
+        name,
+        role
+      ),
+      locations (
+        name,
+        type
+      )
+    `,
+    )
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
