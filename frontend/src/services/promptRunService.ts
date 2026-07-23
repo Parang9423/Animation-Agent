@@ -69,6 +69,52 @@ export type CreatePromptRunInput = {
   memo?: string | null
 }
 
+const PROMPT_RUN_SELECT_WITH_SCENE = `
+  *,
+  prompt_templates (
+    name,
+    template_type,
+    target_tool
+  ),
+  style_guides (
+    name
+  ),
+  characters (
+    name,
+    role
+  ),
+  locations (
+    name,
+    type
+  ),
+  scenes (
+    title,
+    sequence_no,
+    scene_type,
+    status
+  )
+`
+
+const PROMPT_RUN_SELECT_FALLBACK = `
+  *,
+  prompt_templates (
+    name,
+    template_type,
+    target_tool
+  ),
+  style_guides (
+    name
+  ),
+  characters (
+    name,
+    role
+  ),
+  locations (
+    name,
+    type
+  )
+`
+
 export async function createPromptRun(
   promptRun: CreatePromptRunInput,
 ): Promise<PromptRun> {
@@ -104,41 +150,28 @@ export async function getPromptRunsByProject(
 ): Promise<PromptRunWithDetails[]> {
   const { data, error } = await supabase
     .from('prompt_runs')
-    .select(
-      `
-      *,
-      prompt_templates (
-        name,
-        template_type,
-        target_tool
-      ),
-      style_guides (
-        name
-      ),
-      characters (
-        name,
-        role
-      ),
-      locations (
-        name,
-        type
-      ),
-      scenes (
-        title,
-        sequence_no,
-        scene_type,
-        status
-      )
-    `,
-    )
+    .select(PROMPT_RUN_SELECT_WITH_SCENE)
     .eq('project_id', projectId)
     .order('created_at', { ascending: false })
 
-  if (error) {
-    throw error
+  if (!error) {
+    return data ?? []
   }
 
-  return data ?? []
+  const { data: fallbackData, error: fallbackError } = await supabase
+    .from('prompt_runs')
+    .select(PROMPT_RUN_SELECT_FALLBACK)
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false })
+
+  if (fallbackError) {
+    throw fallbackError
+  }
+
+  return (fallbackData ?? []).map((promptRun) => ({
+    ...promptRun,
+    scenes: null,
+  }))
 }
 
 export async function deletePromptRun(promptRunId: string): Promise<void> {
