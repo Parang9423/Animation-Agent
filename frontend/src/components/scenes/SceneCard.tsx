@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { ApprovedAssetPreview } from '../assets/ApprovedAssetPreview'
+import { SceneShotsSection } from '../shots/SceneShotsSection'
 import {
-  getSceneById,
   updateSceneStatus,
   type SceneStatus,
   type SceneWithDetails,
@@ -31,24 +31,6 @@ export function SceneCard({ scene }: SceneCardProps) {
     useState<StatusSaveState>('idle')
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
 
-  useEffect(() => {
-    let isMounted = true
-
-    getSceneById(scene.id)
-      .then((latestScene) => {
-        if (!isMounted || !latestScene) return
-        setCurrentScene(latestScene)
-        setCurrentStatus(normalizeSceneStatus(latestScene.status))
-      })
-      .catch(() => {
-        // Keep rendering from the existing prop if lightweight refresh fails.
-      })
-
-    return () => {
-      isMounted = false
-    }
-  }, [scene.id])
-
   const handleStatusChange = async (nextStatus: SceneStatus) => {
     const previousStatus = currentStatus
 
@@ -59,13 +41,12 @@ export function SceneCard({ scene }: SceneCardProps) {
     try {
       const updatedScene = await updateSceneStatus(currentScene.id, nextStatus)
       setCurrentScene(updatedScene)
-      setCurrentStatus(normalizeSceneStatus(updatedScene.status))
       setStatusSaveState('saved')
-      setStatusMessage(`Scene status updated to ${updatedScene.status ?? nextStatus}`)
+      setStatusMessage(`Scene status updated to ${nextStatus}`)
       window.setTimeout(() => {
         setStatusSaveState('idle')
         setStatusMessage(null)
-      }, 2500)
+      }, 2000)
     } catch (error) {
       setCurrentStatus(previousStatus)
       setStatusSaveState('failed')
@@ -114,7 +95,7 @@ export function SceneCard({ scene }: SceneCardProps) {
           <div>
             <p className="text-sm font-semibold text-slate-300">Production Status</p>
             <p className="mt-1 text-xs text-slate-500">
-              Scene 제작 단계를 변경합니다. scene_image Asset을 approved 처리하면 자동으로 approved까지 올라갑니다.
+              Scene 제작 단계를 변경합니다. 상태는 scenes.status에 즉시 저장됩니다.
             </p>
           </div>
 
@@ -181,6 +162,8 @@ export function SceneCard({ scene }: SceneCardProps) {
           </p>
         </div>
       )}
+
+      <SceneShotsSection projectId={currentScene.project_id} sceneId={currentScene.id} />
     </article>
   )
 }
