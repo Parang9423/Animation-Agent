@@ -10,6 +10,10 @@ import {
   getScenesByProject,
   type SceneWithDetails,
 } from '../../services/sceneService'
+import {
+  getShotsByProject,
+  type Shot,
+} from '../../services/shotService'
 import type { StyleGuide } from '../../services/styleGuideService'
 
 type PromptBuilderPanelProps = {
@@ -22,7 +26,7 @@ type PromptBuilderPanelProps = {
   onPromptRunCreated?: () => void
 }
 
-type BuilderMode = 'character' | 'location' | 'scene'
+type BuilderMode = 'character' | 'location' | 'scene' | 'shot'
 type CopyTarget = 'positive' | 'negative'
 
 type CopyStatus = {
@@ -73,10 +77,13 @@ export function PromptBuilderPanel({
   const [selectedCharacterId, setSelectedCharacterId] = useState('')
   const [selectedLocationId, setSelectedLocationId] = useState('')
   const [selectedSceneId, setSelectedSceneId] = useState('')
+  const [selectedShotId, setSelectedShotId] = useState('')
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [selectedStyleGuideId, setSelectedStyleGuideId] = useState('')
   const [scenes, setScenes] = useState<SceneWithDetails[]>([])
+  const [shots, setShots] = useState<Shot[]>([])
   const [isLoadingScenes, setIsLoadingScenes] = useState(false)
+  const [isLoadingShots, setIsLoadingShots] = useState(false)
   const [sceneFields, setSceneFields] =
     useState<ScenePromptFields>(DEFAULT_SCENE_FIELDS)
   const [copyStatus, setCopyStatus] = useState<CopyStatus>({
@@ -114,6 +121,14 @@ export function PromptBuilderPanel({
   }, [projectId])
 
   useEffect(() => {
+    setIsLoadingShots(true)
+    getShotsByProject(projectId)
+      .then((data) => setShots(data))
+      .catch(() => setShots([]))
+      .finally(() => setIsLoadingShots(false))
+  }, [projectId])
+
+  useEffect(() => {
     if (currentTemplates.length === 0) {
       setSelectedTemplateId('')
       return
@@ -136,20 +151,23 @@ export function PromptBuilderPanel({
     }
   }, [selectedStyleGuideId, styleGuides])
 
+  const selectedShot = shots.find((shot) => shot.id === selectedShotId) ?? null
+  const selectedSceneFromShot = selectedShot
+    ? scenes.find((scene) => scene.id === selectedShot.scene_id) ?? null
+    : null
+  const selectedScene =
+    selectedSceneFromShot ?? scenes.find((scene) => scene.id === selectedSceneId) ?? null
   const selectedCharacter =
     characters.find((character) => character.id === selectedCharacterId) ?? null
   const selectedLocation =
     locations.find((location) => location.id === selectedLocationId) ?? null
-  const selectedScene = scenes.find((scene) => scene.id === selectedSceneId) ?? null
   const selectedTemplate =
     currentTemplates.find((template) => template.id === selectedTemplateId) ?? null
   const selectedStyleGuide =
     styleGuides.find((styleGuide) => styleGuide.id === selectedStyleGuideId) ?? null
 
   const generatedPositivePrompt = useMemo(() => {
-    if (!selectedTemplate?.template_body) {
-      return ''
-    }
+    if (!selectedTemplate?.template_body) return ''
 
     if (builderMode === 'character') {
       if (!selectedCharacter) return ''
@@ -167,10 +185,21 @@ export function PromptBuilderPanel({
       )
     }
 
-    if (!selectedCharacter || !selectedLocation) {
-      return ''
+    if (builderMode === 'shot') {
+      if (!selectedShot || !selectedScene || !selectedCharacter || !selectedLocation) return ''
+      return buildPromptFromTemplate(
+        selectedTemplate.template_body,
+        buildShotPromptValues(
+          selectedCharacter,
+          selectedLocation,
+          selectedScene,
+          selectedShot,
+          selectedStyleGuide,
+        ),
+      )
     }
 
+    if (!selectedCharacter || !selectedLocation) return ''
     return buildPromptFromTemplate(
       selectedTemplate.template_body,
       buildScenePromptValues(
@@ -187,6 +216,7 @@ export function PromptBuilderPanel({
     selectedCharacter,
     selectedLocation,
     selectedScene,
+    selectedShot,
     selectedStyleGuide,
     selectedTemplate,
   ])
@@ -199,12 +229,14 @@ export function PromptBuilderPanel({
       selectedStyleGuide,
       selectedTemplate,
       sceneFields,
+      selectedShot,
     )
   }, [
     builderMode,
     sceneFields,
     selectedCharacter,
     selectedLocation,
+    selectedShot,
     selectedStyleGuide,
     selectedTemplate,
   ])
@@ -224,6 +256,7 @@ export function PromptBuilderPanel({
     selectedCharacter,
     selectedLocation,
     selectedScene,
+    selectedShot,
   )
 
   const handleSceneFieldChange = (
@@ -240,31 +273,38 @@ export function PromptBuilderPanel({
     setSelectedSceneId(nextSceneId)
 
     const nextScene = scenes.find((scene) => scene.id === nextSceneId) ?? null
+    if (!nextScene) return
 
-    if (!nextScene) {
-      return
-    }
+    applySceneContext(nextScene)
+  }
 
-    if (nextScene.character_id) {
-      setSelectedCharacterId(nextScene.character_id)
-    }
+  const handleShotSelectionChange = (nextShotId: string) => {
+    setSelectedShotId(nextShotId)
 
-    if (nextScene.location_id) {
-      setSelectedLocationId(nextScene.location_id)
-    }
+    const nextShot = shots.find((shot) => shot.id === nextShotId) ?? null
+    if (!nextShot) return
+
+    const nextScene = scenes.find((scene) => scene.id === nextShot.scene_id) ?? null
+    if (!nextScene) return
+
+    setSelectedSceneId(nextScene.id)
+    applySceneContext(nextScene)
+  }
+
+  const applySceneContext = (scene: SceneWithDetails) => {
+    if (scene.character_id) setSelectedCharacterId(scene.character_id)
+    if (scene.location_id) setSelectedLocationId(scene.location_id)
 
     setSceneFields({
-      action: nextScene.action ?? DEFAULT_SCENE_FIELDS.action,
-      emotion: nextScene.emotion ?? DEFAULT_SCENE_FIELDS.emotion,
-      camera_shot: nextScene.camera_shot ?? DEFAULT_SCENE_FIELDS.camera_shot,
-      camera_angle: nextScene.camera_angle ?? DEFAULT_SCENE_FIELDS.camera_angle,
-      lighting: nextScene.lighting ?? DEFAULT_SCENE_FIELDS.lighting,
-      time_weather: nextScene.time_weather ?? DEFAULT_SCENE_FIELDS.time_weather,
+      action: scene.action ?? DEFAULT_SCENE_FIELDS.action,
+      emotion: scene.emotion ?? DEFAULT_SCENE_FIELDS.emotion,
+      camera_shot: scene.camera_shot ?? DEFAULT_SCENE_FIELDS.camera_shot,
+      camera_angle: scene.camera_angle ?? DEFAULT_SCENE_FIELDS.camera_angle,
+      lighting: scene.lighting ?? DEFAULT_SCENE_FIELDS.lighting,
+      time_weather: scene.time_weather ?? DEFAULT_SCENE_FIELDS.time_weather,
       additional_notes:
-        nextScene.prompt_summary ??
-        nextScene.description ??
-        DEFAULT_SCENE_FIELDS.additional_notes,
-      negative_notes: nextScene.negative_prompt ?? DEFAULT_SCENE_FIELDS.negative_notes,
+        scene.prompt_summary ?? scene.description ?? DEFAULT_SCENE_FIELDS.additional_notes,
+      negative_notes: scene.negative_prompt ?? DEFAULT_SCENE_FIELDS.negative_notes,
     })
   }
 
@@ -297,18 +337,12 @@ export function PromptBuilderPanel({
     }
 
     if (builderMode === 'character' && !selectedCharacter) {
-      setSaveStatus({
-        status: 'failed',
-        message: 'Character를 선택해야 저장할 수 있습니다.',
-      })
+      setSaveStatus({ status: 'failed', message: 'Character를 선택해야 저장할 수 있습니다.' })
       return
     }
 
     if (builderMode === 'location' && !selectedLocation) {
-      setSaveStatus({
-        status: 'failed',
-        message: 'Location을 선택해야 저장할 수 있습니다.',
-      })
+      setSaveStatus({ status: 'failed', message: 'Location을 선택해야 저장할 수 있습니다.' })
       return
     }
 
@@ -316,6 +350,17 @@ export function PromptBuilderPanel({
       setSaveStatus({
         status: 'failed',
         message: 'Scene 저장에는 Character와 Location이 모두 필요합니다.',
+      })
+      return
+    }
+
+    if (
+      builderMode === 'shot' &&
+      (!selectedShot || !selectedScene || !selectedCharacter || !selectedLocation)
+    ) {
+      setSaveStatus({
+        status: 'failed',
+        message: 'Shot 저장에는 Shot, Scene, Character, Location이 모두 필요합니다.',
       })
       return
     }
@@ -330,14 +375,18 @@ export function PromptBuilderPanel({
         template_id: selectedTemplate.id,
         style_guide_id: selectedStyleGuide?.id ?? null,
         character_id:
-          builderMode === 'character' || builderMode === 'scene'
+          builderMode === 'character' || builderMode === 'scene' || builderMode === 'shot'
             ? selectedCharacter?.id ?? null
             : null,
         location_id:
-          builderMode === 'location' || builderMode === 'scene'
+          builderMode === 'location' || builderMode === 'scene' || builderMode === 'shot'
             ? selectedLocation?.id ?? null
             : null,
-        scene_id: builderMode === 'scene' ? selectedScene?.id ?? null : null,
+        scene_id:
+          builderMode === 'scene' || builderMode === 'shot'
+            ? selectedScene?.id ?? null
+            : null,
+        shot_id: builderMode === 'shot' ? selectedShot?.id ?? null : null,
         positive_prompt: generatedPositivePrompt,
         negative_prompt: generatedNegativePrompt || null,
         input_snapshot: buildInputSnapshot(
@@ -345,6 +394,7 @@ export function PromptBuilderPanel({
           selectedCharacter,
           selectedLocation,
           selectedScene,
+          selectedShot,
           selectedStyleGuide,
           selectedTemplate,
           sceneFields,
@@ -379,7 +429,7 @@ export function PromptBuilderPanel({
         <div>
           <h2 className="text-2xl font-semibold">Prompt Builder</h2>
           <p className="mt-1 text-sm text-slate-500">
-            캐릭터/장소/장면 데이터, 스타일 가이드, Google Flow 템플릿을 조합해 최종 프롬프트를 생성합니다.
+            캐릭터/장소/장면/샷 데이터를 스타일 가이드, Google Flow 템플릿과 조합해 최종 프롬프트를 생성합니다.
           </p>
         </div>
         <span className="rounded-full border border-cyan-700 bg-cyan-950 px-3 py-1 text-sm text-cyan-200">
@@ -394,31 +444,48 @@ export function PromptBuilderPanel({
           <SelectField
             label="Template Type"
             value={builderMode}
-            options={['character', 'location', 'scene']}
+            options={['character', 'location', 'scene', 'shot']}
             onChange={(value) => setBuilderMode(value as BuilderMode)}
           />
 
-          {builderMode === 'scene' && (
+          {builderMode === 'shot' && (
+            <SelectField
+              label="Shot"
+              value={selectedShotId}
+              options={['', ...shots.map((shot) => shot.id)]}
+              optionLabels={{
+                '': isLoadingShots ? 'Loading shots...' : 'Select shot',
+                ...Object.fromEntries(
+                  shots.map((shot) => [
+                    shot.id,
+                    `Shot #${shot.shot_order} ${shot.title}`,
+                  ]),
+                ),
+              }}
+              onChange={handleShotSelectionChange}
+              disabled={isLoadingShots}
+              emptyLabel={isLoadingShots ? 'Loading shots...' : 'No shots'}
+            />
+          )}
+
+          {(builderMode === 'scene' || builderMode === 'shot') && (
             <SelectField
               label="Scene"
-              value={selectedSceneId}
+              value={selectedScene?.id ?? selectedSceneId}
               options={['', ...scenes.map((scene) => scene.id)]}
               optionLabels={{
                 '': isLoadingScenes ? 'Loading scenes...' : 'Manual scene fields',
                 ...Object.fromEntries(
-                  scenes.map((scene) => [
-                    scene.id,
-                    `#${scene.sequence_no} ${scene.title}`,
-                  ]),
+                  scenes.map((scene) => [scene.id, `#${scene.sequence_no} ${scene.title}`]),
                 ),
               }}
               onChange={handleSceneSelectionChange}
-              disabled={isLoadingScenes}
+              disabled={isLoadingScenes || builderMode === 'shot'}
               emptyLabel={isLoadingScenes ? 'Loading scenes...' : 'No scenes'}
             />
           )}
 
-          {(builderMode === 'character' || builderMode === 'scene') && (
+          {(builderMode === 'character' || builderMode === 'scene' || builderMode === 'shot') && (
             <SelectField
               label="Character"
               value={selectedCharacterId}
@@ -430,7 +497,7 @@ export function PromptBuilderPanel({
             />
           )}
 
-          {(builderMode === 'location' || builderMode === 'scene') && (
+          {(builderMode === 'location' || builderMode === 'scene' || builderMode === 'shot') && (
             <SelectField
               label="Location"
               value={selectedLocationId}
@@ -470,10 +537,7 @@ export function PromptBuilderPanel({
           />
 
           {builderMode === 'scene' && (
-            <SceneDirectionFields
-              sceneFields={sceneFields}
-              onChange={handleSceneFieldChange}
-            />
+            <SceneDirectionFields sceneFields={sceneFields} onChange={handleSceneFieldChange} />
           )}
 
           <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4">
@@ -508,7 +572,10 @@ export function PromptBuilderPanel({
             title="Selected Data"
             lines={[
               `Mode: ${builderMode}`,
-              ...(builderMode === 'scene'
+              ...(builderMode === 'shot'
+                ? [`Shot: ${selectedShot ? `#${selectedShot.shot_order} ${selectedShot.title}` : 'No shot'}`]
+                : []),
+              ...(builderMode === 'scene' || builderMode === 'shot'
                 ? [`Scene: ${selectedScene?.title ?? 'Manual scene fields'}`]
                 : []),
               `Subject: ${selectedSubjectName}`,
@@ -524,6 +591,9 @@ export function PromptBuilderPanel({
               `Location: ${selectedLocation?.negative_prompt ?? 'No location negative prompt'}`,
               ...(builderMode === 'scene'
                 ? [`Scene: ${sceneFields.negative_notes || 'No scene negative notes'}`]
+                : []),
+              ...(builderMode === 'shot'
+                ? [`Shot: ${selectedShot?.negative_prompt ?? 'No shot negative prompt'}`]
                 : []),
               `Style: ${selectedStyleGuide?.negative_style ?? 'No style negative prompt'}`,
               `Template: ${selectedTemplate?.negative_prompt ?? 'No template negative prompt'}`,
@@ -788,9 +858,15 @@ function getSelectedSubjectName(
   character: CharacterWithWorldview | null,
   location: LocationWithWorldview | null,
   scene: SceneWithDetails | null,
+  shot: Shot | null,
 ) {
   if (builderMode === 'character') return character?.name ?? 'No character'
   if (builderMode === 'location') return location?.name ?? 'No location'
+  if (builderMode === 'shot') {
+    return shot
+      ? `Shot #${shot.shot_order} ${shot.title}`
+      : 'No shot'
+  }
   if (scene) return `#${scene.sequence_no} ${scene.title}`
   return `${character?.name ?? 'No character'} @ ${location?.name ?? 'No location'}`
 }
@@ -811,6 +887,7 @@ function buildNegativePrompt(
   styleGuide: StyleGuide | null,
   template: PromptTemplate | null,
   sceneFields: ScenePromptFields,
+  shot: Shot | null,
 ) {
   const subjectNegativePrompt =
     builderMode === 'character'
@@ -827,6 +904,7 @@ function buildNegativePrompt(
     styleGuide?.negative_style,
     styleGuide?.prompt_suffix,
     builderMode === 'scene' ? sceneFields.negative_notes : null,
+    builderMode === 'shot' ? shot?.negative_prompt : null,
   ]
     .filter((value): value is string => Boolean(value?.trim()))
     .join('\n\n')
@@ -837,6 +915,7 @@ function buildInputSnapshot(
   character: CharacterWithWorldview | null,
   location: LocationWithWorldview | null,
   scene: SceneWithDetails | null,
+  shot: Shot | null,
   styleGuide: StyleGuide | null,
   template: PromptTemplate | null,
   sceneFields: ScenePromptFields,
@@ -886,6 +965,22 @@ function buildInputSnapshot(
           scene_type: scene.scene_type,
           status: scene.status,
           prompt_summary: scene.prompt_summary,
+        }
+      : null,
+    shot: shot
+      ? {
+          id: shot.id,
+          scene_id: shot.scene_id,
+          shot_order: shot.shot_order,
+          title: shot.title,
+          shot_type: shot.shot_type,
+          status: shot.status,
+          action: shot.action,
+          emotion: shot.emotion,
+          camera_shot: shot.camera_shot,
+          camera_angle: shot.camera_angle,
+          camera_movement: shot.camera_movement,
+          duration_sec: shot.duration_sec,
         }
       : null,
     scene_fields: builderMode === 'scene' ? sceneFields : null,
@@ -959,6 +1054,7 @@ function buildScenePromptValues(
     'scene.sequence_no': scene?.sequence_no ? String(scene.sequence_no) : '',
     'scene.title': scene?.title ?? '',
     'scene.type': scene?.scene_type ?? '',
+    'scene.scene_type': scene?.scene_type ?? '',
     'scene.description': scene?.description ?? '',
     'scene.prompt_summary': scene?.prompt_summary ?? '',
     'scene.action': sceneFields.action,
@@ -969,5 +1065,45 @@ function buildScenePromptValues(
     'scene.time_weather': sceneFields.time_weather,
     'scene.additional_notes': sceneFields.additional_notes,
     'scene.negative_notes': sceneFields.negative_notes,
+  }
+}
+
+function buildShotPromptValues(
+  character: CharacterWithWorldview,
+  location: LocationWithWorldview,
+  scene: SceneWithDetails,
+  shot: Shot,
+  styleGuide: StyleGuide | null,
+) {
+  return {
+    ...buildCharacterPromptValues(character, styleGuide),
+    ...buildLocationPromptValues(location, styleGuide),
+    'scene.id': scene.id,
+    'scene.sequence_no': String(scene.sequence_no),
+    'scene.title': scene.title,
+    'scene.type': scene.scene_type ?? '',
+    'scene.scene_type': scene.scene_type ?? '',
+    'scene.description': scene.description ?? '',
+    'scene.prompt_summary': scene.prompt_summary ?? scene.description ?? '',
+    'scene.action': scene.action ?? '',
+    'scene.emotion': scene.emotion ?? '',
+    'scene.camera_shot': scene.camera_shot ?? '',
+    'scene.camera_angle': scene.camera_angle ?? '',
+    'scene.lighting': scene.lighting ?? '',
+    'scene.time_weather': scene.time_weather ?? '',
+    'shot.id': shot.id,
+    'shot.shot_order': String(shot.shot_order),
+    'shot.title': shot.title,
+    'shot.shot_type': shot.shot_type ?? '',
+    'shot.camera_shot': shot.camera_shot ?? '',
+    'shot.camera_angle': shot.camera_angle ?? '',
+    'shot.camera_movement': shot.camera_movement ?? '',
+    'shot.duration_sec': shot.duration_sec ? String(shot.duration_sec) : '',
+    'shot.action': shot.action ?? '',
+    'shot.dialogue': shot.dialogue ?? '',
+    'shot.emotion': shot.emotion ?? '',
+    'shot.visual_prompt': shot.visual_prompt ?? '',
+    'shot.video_prompt': shot.video_prompt ?? '',
+    'shot.negative_prompt': shot.negative_prompt ?? '',
   }
 }
