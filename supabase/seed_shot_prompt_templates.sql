@@ -1,21 +1,24 @@
 -- Seed shot prompt templates for Eternal Rift.
 -- Run this after supabase/20260723_create_shots_table.sql has been applied.
--- This file uses only the prompt_templates columns currently used by the app.
+-- This file matches the current public.prompt_templates schema.
 
 insert into public.prompt_templates (
   project_id,
   name,
-  template_type,
   target_tool,
+  template_type,
   template_body,
-  memo
+  variables,
+  description,
+  is_global,
+  metadata
 )
 values
 (
   '00000000-0000-4000-8000-000000000001',
   'Eternal Rift Shot Image Prompt',
-  'shot',
   'google_flow',
+  'shot',
   '{{style.prompt_prefix}}
 
 Create a cinematic anime keyframe image for a single shot in Eternal Rift.
@@ -58,13 +61,16 @@ Negative prompt:
 no inconsistent character design, no changed outfit, no wrong location, no unreadable face, no extra limbs, no distorted hands, no unrelated props, no comedic tone, no bright cheerful color palette, no low-detail background, no text artifacts, no watermark
 
 {{style.prompt_suffix}}',
-  'Shot-level keyframe image prompt template for Google Flow.'
+  '["style.prompt_prefix","style.prompt_suffix","scene.sequence_no","scene.title","scene.scene_type","scene.prompt_summary","scene.lighting","scene.time_weather","shot.shot_order","shot.title","shot.shot_type","shot.action","shot.emotion","shot.dialogue","shot.camera_shot","shot.camera_angle","shot.camera_movement","shot.visual_prompt","character.name","character.role","character.prompt_summary","location.name","location.prompt_summary","location.atmosphere"]'::jsonb,
+  'Shot-level keyframe image prompt template for Google Flow.',
+  false,
+  '{"category":"shot","output":"image","tool":"google_flow"}'::jsonb
 ),
 (
   '00000000-0000-4000-8000-000000000001',
   'Eternal Rift Shot Video Prompt',
-  'shot',
   'google_flow',
+  'shot',
   '{{style.prompt_prefix}}
 
 Create a cinematic anime video shot for Eternal Rift.
@@ -110,6 +116,9 @@ Negative prompt:
 no identity drift, no character morphing, no outfit changes, no wrong location, no unstable face, no warped body, no extra limbs, no flickering, no camera jitter, no unreadable action, no text artifacts, no watermark, no abrupt style shift
 
 {{style.prompt_suffix}}',
-  'Shot-level video prompt template for Google Flow or future video generation tools.'
+  '["style.prompt_prefix","style.prompt_suffix","scene.sequence_no","scene.title","scene.prompt_summary","scene.lighting","scene.time_weather","shot.shot_order","shot.title","shot.shot_type","shot.duration_sec","shot.action","shot.emotion","shot.dialogue","shot.camera_shot","shot.camera_angle","shot.camera_movement","shot.video_prompt","character.name","character.role","character.prompt_summary","location.name","location.prompt_summary","location.atmosphere"]'::jsonb,
+  'Shot-level video prompt template for Google Flow or future video generation tools.',
+  false,
+  '{"category":"shot","output":"video","tool":"google_flow"}'::jsonb
 )
 on conflict do nothing;
