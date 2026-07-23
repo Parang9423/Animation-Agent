@@ -107,7 +107,7 @@ export function AssetCreateForm({
     if (nextPromptRun.prompt_type === 'scene') {
       setAssetType('scene_image')
       setRelatedEntityType('scene')
-      setRelatedEntityId('')
+      setRelatedEntityId(nextPromptRun.scene_id ?? '')
     }
 
     setMetadataText(
@@ -119,6 +119,8 @@ export function AssetCreateForm({
           character_name: nextPromptRun.characters?.name ?? null,
           location_id: nextPromptRun.location_id,
           location_name: nextPromptRun.locations?.name ?? null,
+          scene_id: nextPromptRun.scene_id,
+          scene_title: nextPromptRun.scenes?.title ?? null,
           selected_candidate: true,
         },
         null,
@@ -456,12 +458,14 @@ export function AssetCreateForm({
 }
 
 function getPromptRunLabel(promptRun: PromptRunWithDetails) {
+  const sceneTitle = promptRun.scenes?.title
   const characterName = promptRun.characters?.name
   const locationName = promptRun.locations?.name
   const subject =
-    characterName && locationName
+    sceneTitle ??
+    (characterName && locationName
       ? `${characterName} @ ${locationName}`
-      : characterName ?? locationName ?? promptRun.prompt_type
+      : characterName ?? locationName ?? promptRun.prompt_type)
 
   return `${subject} · ${promptRun.output_status} · ${promptRun.id.slice(0, 8)}`
 }
