@@ -11,6 +11,7 @@ import { PromptRunCard } from './components/promptRuns/PromptRunCard'
 import { PromptTemplateCard } from './components/promptTemplates/PromptTemplateCard'
 import { RelationshipCard } from './components/relationships/RelationshipCard'
 import { SceneCard } from './components/scenes/SceneCard'
+import { SceneCreateForm } from './components/scenes/SceneCreateForm'
 import { WorldviewCard } from './components/worldviews/WorldviewCard'
 import { AppLayout } from './layouts/AppLayout'
 import type { AppSection } from './layouts/Sidebar'
@@ -91,32 +92,28 @@ function App() {
   const [isLoadingStyleGuides, setIsLoadingStyleGuides] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
+  const loadScenes = useCallback(() => {
+    setIsLoadingScenes(true)
+    getScenesByProject(ETERNAL_RIFT_PROJECT_ID)
+      .then((data) => setScenes(data))
+      .catch((error) => setErrorMessage(error.message))
+      .finally(() => setIsLoadingScenes(false))
+  }, [])
+
   const loadPromptRuns = useCallback(() => {
     setIsLoadingPromptRuns(true)
     getPromptRunsByProject(ETERNAL_RIFT_PROJECT_ID)
-      .then((data) => {
-        setPromptRuns(data)
-      })
-      .catch((error) => {
-        setErrorMessage(error.message)
-      })
-      .finally(() => {
-        setIsLoadingPromptRuns(false)
-      })
+      .then((data) => setPromptRuns(data))
+      .catch((error) => setErrorMessage(error.message))
+      .finally(() => setIsLoadingPromptRuns(false))
   }, [])
 
   const loadAssets = useCallback(() => {
     setIsLoadingAssets(true)
     getAssetsByProject(ETERNAL_RIFT_PROJECT_ID)
-      .then((data) => {
-        setAssets(data)
-      })
-      .catch((error) => {
-        setErrorMessage(error.message)
-      })
-      .finally(() => {
-        setIsLoadingAssets(false)
-      })
+      .then((data) => setAssets(data))
+      .catch((error) => setErrorMessage(error.message))
+      .finally(() => setIsLoadingAssets(false))
   }, [])
 
   const refreshPromptRunDependentData = useCallback(() => {
@@ -148,10 +145,7 @@ function App() {
       .catch((error) => setErrorMessage(error.message))
       .finally(() => setIsLoadingLocations(false))
 
-    getScenesByProject(ETERNAL_RIFT_PROJECT_ID)
-      .then((data) => setScenes(data))
-      .catch((error) => setErrorMessage(error.message))
-      .finally(() => setIsLoadingScenes(false))
+    loadScenes()
 
     getFactionsByProject(ETERNAL_RIFT_PROJECT_ID)
       .then((data) => setFactions(data))
@@ -175,7 +169,7 @@ function App() {
       .then((data) => setStyleGuides(data))
       .catch((error) => setErrorMessage(error.message))
       .finally(() => setIsLoadingStyleGuides(false))
-  }, [loadAssets, loadPromptRuns])
+  }, [loadAssets, loadPromptRuns, loadScenes])
 
   return (
     <AppLayout
@@ -237,9 +231,13 @@ function App() {
 
       {activeSection === 'scenes' && (
         <ScenesSection
+          projectId={ETERNAL_RIFT_PROJECT_ID}
           scenes={scenes}
+          characters={characters}
+          locations={locations}
           isLoadingScenes={isLoadingScenes}
           errorMessage={errorMessage}
+          onSceneCreated={loadScenes}
         />
       )}
 
@@ -325,22 +323,16 @@ function PageIntro({ activeSection }: PageIntroProps) {
   }
 
   const sectionDescriptionMap: Record<AppSection, string> = {
-    overview:
-      'Supabase에 저장된 프로젝트와 핵심 제작 데이터를 한눈에 확인합니다.',
-    characters:
-      'Eternal Rift 캐릭터 목록과 선택한 캐릭터의 상세 설정을 확인합니다.',
-    worldviews:
-      'Eternal Rift 세계관 규칙, 문명 수준, 시각 톤, 프롬프트 요약을 확인합니다.',
+    overview: 'Supabase에 저장된 프로젝트와 핵심 제작 데이터를 한눈에 확인합니다.',
+    characters: 'Eternal Rift 캐릭터 목록과 선택한 캐릭터의 상세 설정을 확인합니다.',
+    worldviews: 'Eternal Rift 세계관 규칙, 문명 수준, 시각 톤, 프롬프트 요약을 확인합니다.',
     locations: 'Eternal Rift 장소와 배경 프롬프트 데이터를 확인합니다.',
-    scenes: 'Eternal Rift 장면 구성, 연출 정보, 대표 씬 이미지를 확인합니다.',
+    scenes: 'Eternal Rift 장면 구성, 연출 정보, 대표 씬 이미지를 생성/관리합니다.',
     factions: 'Eternal Rift 세력, 조직, 문명 정보를 확인합니다.',
     relationships: 'Eternal Rift 캐릭터 간 관계, 감정선, 갈등 구조를 확인합니다.',
-    promptBuilder:
-      '캐릭터/장소/장면 데이터, 스타일 가이드, 프롬프트 템플릿을 조합해 Google Flow용 최종 프롬프트를 생성하고 실행 기록으로 저장합니다.',
-    promptRuns:
-      'Prompt Builder에서 저장한 프롬프트 실행 기록과 연결된 Asset 후보를 비교합니다.',
-    assets:
-      'Google Flow 생성 결과 이미지와 영상 후보를 등록하고 prompt run과 연결합니다.',
+    promptBuilder: '캐릭터/장소/장면 데이터, 스타일 가이드, 프롬프트 템플릿을 조합해 Google Flow용 최종 프롬프트를 생성하고 실행 기록으로 저장합니다.',
+    promptRuns: 'Prompt Builder에서 저장한 프롬프트 실행 기록과 연결된 Asset 후보를 비교합니다.',
+    assets: 'Google Flow 생성 결과 이미지와 영상 후보를 등록하고 prompt run과 연결합니다.',
     promptTemplates: 'Google Flow용 프롬프트 템플릿과 변수를 확인합니다.',
   }
 
@@ -412,13 +404,10 @@ function OverviewSection({
           description="Story IP 프로젝트 기본 정보"
           countLabel={`${projects.length} projects`}
         />
-
         {isLoadingProjects && <p className="text-slate-400">Loading projects...</p>}
-
         {!isLoadingProjects && !errorMessage && projects.length === 0 && (
           <EmptyState>조회된 프로젝트가 없습니다.</EmptyState>
         )}
-
         <div className="grid gap-4">
           {projects.map((project) => (
             <ProjectCard key={project.id} project={project} />
@@ -451,15 +440,10 @@ function CharactersSection({
         description="Eternal Rift 주요 캐릭터 목록"
         countLabel={`${characters.length} characters`}
       />
-
-      {isLoadingCharacters && (
-        <p className="text-slate-400">Loading characters...</p>
-      )}
-
+      {isLoadingCharacters && <p className="text-slate-400">Loading characters...</p>}
       {!isLoadingCharacters && !errorMessage && characters.length === 0 && (
         <EmptyState>조회된 캐릭터가 없습니다.</EmptyState>
       )}
-
       <div className="grid gap-4 md:grid-cols-3">
         {characters.map((character) => (
           <CharacterCard
@@ -470,10 +454,7 @@ function CharactersSection({
           />
         ))}
       </div>
-
-      {selectedCharacter && (
-        <CharacterDetailPanel character={selectedCharacter} />
-      )}
+      {selectedCharacter && <CharacterDetailPanel character={selectedCharacter} />}
     </section>
   )
 }
@@ -496,15 +477,10 @@ function WorldviewsSection({
         description="Eternal Rift 세계관 목록"
         countLabel={`${worldviews.length} worldviews`}
       />
-
-      {isLoadingWorldviews && (
-        <p className="text-slate-400">Loading worldviews...</p>
-      )}
-
+      {isLoadingWorldviews && <p className="text-slate-400">Loading worldviews...</p>}
       {!isLoadingWorldviews && !errorMessage && worldviews.length === 0 && (
         <EmptyState>조회된 세계관이 없습니다.</EmptyState>
       )}
-
       <div className="grid gap-5">
         {worldviews.map((worldview) => (
           <WorldviewCard key={worldview.id} worldview={worldview} />
@@ -532,15 +508,10 @@ function LocationsSection({
         description="Eternal Rift 장소와 배경 목록"
         countLabel={`${locations.length} locations`}
       />
-
-      {isLoadingLocations && (
-        <p className="text-slate-400">Loading locations...</p>
-      )}
-
+      {isLoadingLocations && <p className="text-slate-400">Loading locations...</p>}
       {!isLoadingLocations && !errorMessage && locations.length === 0 && (
         <EmptyState>조회된 장소가 없습니다.</EmptyState>
       )}
-
       <div className="grid gap-5">
         {locations.map((location) => (
           <LocationCard key={location.id} location={location} />
@@ -551,30 +522,51 @@ function LocationsSection({
 }
 
 type ScenesSectionProps = {
+  projectId: string
   scenes: SceneWithDetails[]
+  characters: CharacterWithWorldview[]
+  locations: LocationWithWorldview[]
   isLoadingScenes: boolean
   errorMessage: string | null
+  onSceneCreated: () => void
 }
 
 function ScenesSection({
+  projectId,
   scenes,
+  characters,
+  locations,
   isLoadingScenes,
   errorMessage,
+  onSceneCreated,
 }: ScenesSectionProps) {
+  const nextSequenceNo = useMemo(() => {
+    const maxSequenceNo = scenes.reduce(
+      (maxValue, scene) => Math.max(maxValue, scene.sequence_no ?? 0),
+      0,
+    )
+
+    return maxSequenceNo + 1
+  }, [scenes])
+
   return (
     <section className="mt-8">
       <SectionHeader
         title="Scenes"
-        description="Eternal Rift 장면 구성과 대표 이미지를 확인합니다."
+        description="Eternal Rift 장면 구성과 대표 이미지를 생성/관리합니다."
         countLabel={`${scenes.length} scenes`}
       />
-
+      <SceneCreateForm
+        projectId={projectId}
+        characters={characters}
+        locations={locations}
+        nextSequenceNo={nextSequenceNo}
+        onCreated={onSceneCreated}
+      />
       {isLoadingScenes && <p className="text-slate-400">Loading scenes...</p>}
-
       {!isLoadingScenes && !errorMessage && scenes.length === 0 && (
-        <EmptyState>조회된 Scene이 없습니다. scenes 테이블에 장면 데이터를 추가하면 이 탭에 표시됩니다.</EmptyState>
+        <EmptyState>조회된 Scene이 없습니다. New Scene 폼으로 장면을 추가하세요.</EmptyState>
       )}
-
       <div className="grid gap-5">
         {scenes.map((scene) => (
           <SceneCard key={scene.id} scene={scene} />
@@ -602,15 +594,10 @@ function FactionsSection({
         description="Eternal Rift 세력과 문명 목록"
         countLabel={`${factions.length} factions`}
       />
-
-      {isLoadingFactions && (
-        <p className="text-slate-400">Loading factions...</p>
-      )}
-
+      {isLoadingFactions && <p className="text-slate-400">Loading factions...</p>}
       {!isLoadingFactions && !errorMessage && factions.length === 0 && (
         <EmptyState>조회된 세력이 없습니다.</EmptyState>
       )}
-
       <div className="grid gap-5">
         {factions.map((faction) => (
           <FactionCard key={faction.id} faction={faction} />
@@ -638,15 +625,10 @@ function RelationshipsSection({
         description="Eternal Rift 캐릭터 관계와 갈등 구조"
         countLabel={`${relationships.length} relationships`}
       />
-
-      {isLoadingRelationships && (
-        <p className="text-slate-400">Loading relationships...</p>
-      )}
-
+      {isLoadingRelationships && <p className="text-slate-400">Loading relationships...</p>}
       {!isLoadingRelationships && !errorMessage && relationships.length === 0 && (
         <EmptyState>조회된 관계가 없습니다.</EmptyState>
       )}
-
       <div className="grid gap-5">
         {relationships.map((relationship) => (
           <RelationshipCard
@@ -706,15 +688,10 @@ function PromptRunsSection({
         description="Prompt Builder에서 저장한 프롬프트 실행 기록과 연결 Asset 후보"
         countLabel={`${promptRuns.length} runs · ${linkedAssetCount} linked assets`}
       />
-
-      {isLoadingPromptRuns && (
-        <p className="text-slate-400">Loading prompt runs...</p>
-      )}
-
+      {isLoadingPromptRuns && <p className="text-slate-400">Loading prompt runs...</p>}
       {!isLoadingPromptRuns && !errorMessage && promptRuns.length === 0 && (
         <EmptyState>저장된 Prompt Run이 없습니다.</EmptyState>
       )}
-
       <div className="grid gap-5">
         {promptRuns.map((promptRun) => (
           <PromptRunCard
@@ -792,13 +769,7 @@ function AssetsSection({
           matchesPromptRunLink
         )
       }),
-    [
-      assets,
-      assetTypeFilter,
-      promptRunLinkFilter,
-      sourceTypeFilter,
-      statusFilter,
-    ],
+    [assets, assetTypeFilter, promptRunLinkFilter, sourceTypeFilter, statusFilter],
   )
 
   const resetFilters = () => {
@@ -830,7 +801,6 @@ function AssetsSection({
               상태, 유형, 출처, prompt_run 연결 여부로 Asset 목록을 필터링합니다.
             </p>
           </div>
-
           <button
             type="button"
             onClick={resetFilters}
@@ -878,18 +848,15 @@ function AssetsSection({
 
       <div className="mt-8">
         {isLoadingAssets && <p className="text-slate-400">Loading assets...</p>}
-
         {!isLoadingAssets && !errorMessage && assets.length === 0 && (
           <EmptyState>등록된 Asset이 없습니다.</EmptyState>
         )}
-
         {!isLoadingAssets &&
           !errorMessage &&
           assets.length > 0 &&
           filteredAssets.length === 0 && (
             <EmptyState>현재 필터 조건에 맞는 Asset이 없습니다.</EmptyState>
           )}
-
         <div className="grid gap-5">
           {filteredAssets.map((asset) => (
             <AssetCard
@@ -957,15 +924,10 @@ function PromptTemplatesSection({
         description="Google Flow용 프롬프트 템플릿 목록"
         countLabel={`${promptTemplates.length} templates`}
       />
-
-      {isLoadingPromptTemplates && (
-        <p className="text-slate-400">Loading prompt templates...</p>
-      )}
-
+      {isLoadingPromptTemplates && <p className="text-slate-400">Loading prompt templates...</p>}
       {!isLoadingPromptTemplates && !errorMessage && promptTemplates.length === 0 && (
         <EmptyState>조회된 프롬프트 템플릿이 없습니다.</EmptyState>
       )}
-
       <div className="grid gap-5">
         {promptTemplates.map((promptTemplate) => (
           <PromptTemplateCard
@@ -986,12 +948,11 @@ type SectionHeaderProps = {
 
 function SectionHeader({ title, description, countLabel }: SectionHeaderProps) {
   return (
-    <div className="mb-4 flex items-center justify-between gap-4">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
       <div>
         <h2 className="text-2xl font-semibold">{title}</h2>
         <p className="mt-1 text-sm text-slate-500">{description}</p>
       </div>
-
       <span className="shrink-0 rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-sm text-slate-300">
         {countLabel}
       </span>
