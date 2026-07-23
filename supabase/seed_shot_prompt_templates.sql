@@ -1,5 +1,6 @@
 -- Seed shot prompt templates for Eternal Rift.
 -- Run this after supabase/20260723_create_shots_table.sql has been applied.
+-- This file matches the current prompt_templates schema.
 
 insert into public.prompt_templates (
   project_id,
@@ -7,7 +8,6 @@ insert into public.prompt_templates (
   template_type,
   target_tool,
   template_body,
-  negative_prompt,
   required_variables,
   memo
 )
@@ -55,8 +55,10 @@ Lighting and atmosphere:
 Continuity rules:
 Keep the approved character and scene visual identity consistent. Preserve hairstyle, outfit, signature items, facial structure, color language, location geometry, and story tone. Make this a clean production keyframe that can be used as a video reference image.
 
+Negative prompt:
+no inconsistent character design, no changed outfit, no wrong location, no unreadable face, no extra limbs, no distorted hands, no unrelated props, no comedic tone, no bright cheerful color palette, no low-detail background, no text artifacts, no watermark
+
 {{style.prompt_suffix}}',
-  'no inconsistent character design, no changed outfit, no wrong location, no unreadable face, no extra limbs, no distorted hands, no unrelated props, no comedic tone, no bright cheerful color palette, no low-detail background, no text artifacts, no watermark',
   array[
     'style.prompt_prefix',
     'style.prompt_suffix',
@@ -131,8 +133,10 @@ Lighting and atmosphere:
 Motion rules:
 Use restrained, cinematic motion. Keep animation coherent and physically readable. Avoid sudden cuts inside the shot unless specified. Preserve character identity, outfit, face, body proportions, lighting continuity, and scene geography across the entire duration.
 
+Negative prompt:
+no identity drift, no character morphing, no outfit changes, no wrong location, no unstable face, no warped body, no extra limbs, no flickering, no camera jitter, no unreadable action, no text artifacts, no watermark, no abrupt style shift
+
 {{style.prompt_suffix}}',
-  'no identity drift, no character morphing, no outfit changes, no wrong location, no unstable face, no warped body, no extra limbs, no flickering, no camera jitter, no unreadable action, no text artifacts, no watermark, no abrupt style shift',
   array[
     'style.prompt_prefix',
     'style.prompt_suffix',
