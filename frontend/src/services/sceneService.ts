@@ -68,24 +68,24 @@ export type CreateSceneInput = {
   memo?: string | null
 }
 
+const SCENE_SELECT = `
+  *,
+  characters (
+    name,
+    role
+  ),
+  locations (
+    name,
+    type
+  )
+`
+
 export async function getScenesByProject(
   projectId: string,
 ): Promise<SceneWithDetails[]> {
   const { data, error } = await supabase
     .from('scenes')
-    .select(
-      `
-      *,
-      characters (
-        name,
-        role
-      ),
-      locations (
-        name,
-        type
-      )
-    `,
-    )
+    .select(SCENE_SELECT)
     .eq('project_id', projectId)
     .order('sequence_no', { ascending: true })
     .order('created_at', { ascending: true })
@@ -95,6 +95,20 @@ export async function getScenesByProject(
   }
 
   return data ?? []
+}
+
+export async function getSceneById(sceneId: string): Promise<SceneWithDetails | null> {
+  const { data, error } = await supabase
+    .from('scenes')
+    .select(SCENE_SELECT)
+    .eq('id', sceneId)
+    .maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  return data ?? null
 }
 
 export async function createScene(scene: CreateSceneInput): Promise<SceneWithDetails> {
@@ -119,19 +133,7 @@ export async function createScene(scene: CreateSceneInput): Promise<SceneWithDet
       status: scene.status ?? 'draft',
       memo: scene.memo ?? null,
     })
-    .select(
-      `
-      *,
-      characters (
-        name,
-        role
-      ),
-      locations (
-        name,
-        type
-      )
-    `,
-    )
+    .select(SCENE_SELECT)
     .single()
 
   if (error) {
@@ -152,19 +154,7 @@ export async function updateSceneStatus(
       updated_at: new Date().toISOString(),
     })
     .eq('id', sceneId)
-    .select(
-      `
-      *,
-      characters (
-        name,
-        role
-      ),
-      locations (
-        name,
-        type
-      )
-    `,
-    )
+    .select(SCENE_SELECT)
     .single()
 
   if (error) {
