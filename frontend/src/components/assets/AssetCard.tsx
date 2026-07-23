@@ -5,6 +5,7 @@ import {
   type AssetStatus,
   type AssetWithPromptRun,
 } from '../../services/assetService'
+import { updateSceneStatus } from '../../services/sceneService'
 
 type AssetCardProps = {
   asset: AssetWithPromptRun
@@ -49,13 +50,20 @@ export function AssetCard({ asset, onChanged, onDeleted }: AssetCardProps) {
 
     try {
       await updateAssetStatus(asset.id, nextStatus)
+
+      const sceneAutoApprovalMessage = await maybeApproveLinkedScene(asset, nextStatus)
+
       setStatusSaveState('saved')
-      setStatusMessage(`Status updated to ${nextStatus}`)
+      setStatusMessage(
+        sceneAutoApprovalMessage
+          ? `Status updated to ${nextStatus}. ${sceneAutoApprovalMessage}`
+          : `Status updated to ${nextStatus}`,
+      )
       onChanged?.()
       window.setTimeout(() => {
         setStatusSaveState('idle')
         setStatusMessage(null)
-      }, 2000)
+      }, 2500)
     } catch (error) {
       setCurrentStatus(previousStatus)
       setStatusSaveState('failed')
@@ -153,7 +161,7 @@ export function AssetCard({ asset, onChanged, onDeleted }: AssetCardProps) {
           <div>
             <p className="text-sm font-semibold text-slate-300">Asset Status</p>
             <p className="mt-1 text-xs text-slate-500">
-              후보/승인/폐기/보관 상태를 즉시 변경합니다.
+              후보/승인/폐기/보관 상태를 즉시 변경합니다. Scene 이미지 승인 시 Scene status도 approved로 자동 갱신됩니다.
             </p>
           </div>
 
@@ -253,6 +261,25 @@ function InfoBlock({ label, value }: InfoBlockProps) {
       )}
     </div>
   )
+}
+
+async function maybeApproveLinkedScene(
+  asset: AssetWithPromptRun,
+  nextStatus: AssetStatus,
+) {
+  const shouldApproveLinkedScene =
+    nextStatus === 'approved' &&
+    asset.asset_type === 'scene_image' &&
+    asset.related_entity_type === 'scene' &&
+    Boolean(asset.related_entity_id)
+
+  if (!shouldApproveLinkedScene || !asset.related_entity_id) {
+    return null
+  }
+
+  await updateSceneStatus(asset.related_entity_id, 'approved')
+
+  return 'Linked Scene status updated to approved.'
 }
 
 function getPromptRunSubject(asset: AssetWithPromptRun) {
