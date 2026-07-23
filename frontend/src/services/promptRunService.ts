@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabaseClient'
 
-export type PromptRunType = 'character' | 'location' | 'scene'
+export type PromptRunType = 'character' | 'location' | 'scene' | 'shot'
 export type PromptRunStatus =
   | 'draft'
   | 'copied'
@@ -19,6 +19,7 @@ export type PromptRun = {
   character_id: string | null
   location_id: string | null
   scene_id: string | null
+  shot_id: string | null
   positive_prompt: string
   negative_prompt: string | null
   input_snapshot: Record<string, unknown>
@@ -51,6 +52,12 @@ export type PromptRunWithDetails = PromptRun & {
     scene_type: string | null
     status: string | null
   } | null
+  shots: {
+    title: string
+    shot_order: number | null
+    shot_type: string | null
+    status: string | null
+  } | null
 }
 
 export type CreatePromptRunInput = {
@@ -62,6 +69,7 @@ export type CreatePromptRunInput = {
   character_id?: string | null
   location_id?: string | null
   scene_id?: string | null
+  shot_id?: string | null
   positive_prompt: string
   negative_prompt?: string | null
   input_snapshot?: Record<string, unknown>
@@ -69,7 +77,7 @@ export type CreatePromptRunInput = {
   memo?: string | null
 }
 
-const PROMPT_RUN_SELECT_WITH_SCENE = `
+const PROMPT_RUN_SELECT_WITH_DETAILS = `
   *,
   prompt_templates (
     name,
@@ -91,6 +99,12 @@ const PROMPT_RUN_SELECT_WITH_SCENE = `
     title,
     sequence_no,
     scene_type,
+    status
+  ),
+  shots (
+    title,
+    shot_order,
+    shot_type,
     status
   )
 `
@@ -129,6 +143,7 @@ export async function createPromptRun(
       character_id: promptRun.character_id ?? null,
       location_id: promptRun.location_id ?? null,
       scene_id: promptRun.scene_id ?? null,
+      shot_id: promptRun.shot_id ?? null,
       positive_prompt: promptRun.positive_prompt,
       negative_prompt: promptRun.negative_prompt ?? null,
       input_snapshot: promptRun.input_snapshot ?? {},
@@ -150,7 +165,7 @@ export async function getPromptRunsByProject(
 ): Promise<PromptRunWithDetails[]> {
   const { data, error } = await supabase
     .from('prompt_runs')
-    .select(PROMPT_RUN_SELECT_WITH_SCENE)
+    .select(PROMPT_RUN_SELECT_WITH_DETAILS)
     .eq('project_id', projectId)
     .order('created_at', { ascending: false })
 
@@ -171,11 +186,12 @@ export async function getPromptRunsByProject(
   return (fallbackData ?? []).map((promptRun) => ({
     ...promptRun,
     scenes: null,
+    shots: null,
   }))
 }
 
 export async function deletePromptRun(promptRunId: string): Promise<void> {
-  const { error } = await supabase.from('prompt_runs').delete().eq('id', promptRunId)
+  const { error } = supabase.from('prompt_runs').delete().eq('id', promptRunId)
 
   if (error) {
     throw error
