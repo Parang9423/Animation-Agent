@@ -18,6 +18,7 @@ export type PromptRun = {
   style_guide_id: string | null
   character_id: string | null
   location_id: string | null
+  scene_id: string | null
   positive_prompt: string
   negative_prompt: string | null
   input_snapshot: Record<string, unknown>
@@ -44,6 +45,12 @@ export type PromptRunWithDetails = PromptRun & {
     name: string
     type: string | null
   } | null
+  scenes: {
+    title: string
+    sequence_no: number | null
+    scene_type: string | null
+    status: string | null
+  } | null
 }
 
 export type CreatePromptRunInput = {
@@ -54,6 +61,7 @@ export type CreatePromptRunInput = {
   style_guide_id?: string | null
   character_id?: string | null
   location_id?: string | null
+  scene_id?: string | null
   positive_prompt: string
   negative_prompt?: string | null
   input_snapshot?: Record<string, unknown>
@@ -74,6 +82,7 @@ export async function createPromptRun(
       style_guide_id: promptRun.style_guide_id ?? null,
       character_id: promptRun.character_id ?? null,
       location_id: promptRun.location_id ?? null,
+      scene_id: promptRun.scene_id ?? null,
       positive_prompt: promptRun.positive_prompt,
       negative_prompt: promptRun.negative_prompt ?? null,
       input_snapshot: promptRun.input_snapshot ?? {},
@@ -113,6 +122,12 @@ export async function getPromptRunsByProject(
       locations (
         name,
         type
+      ),
+      scenes (
+        title,
+        sequence_no,
+        scene_type,
+        status
       )
     `,
     )
