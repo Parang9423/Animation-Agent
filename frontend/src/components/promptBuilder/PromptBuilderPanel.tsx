@@ -6,6 +6,10 @@ import {
   type PromptRunType,
 } from '../../services/promptRunService'
 import type { PromptTemplate } from '../../services/promptTemplateService'
+import {
+  getScenesByProject,
+  type SceneWithDetails,
+} from '../../services/sceneService'
 import type { StyleGuide } from '../../services/styleGuideService'
 
 type PromptBuilderPanelProps = {
@@ -68,8 +72,11 @@ export function PromptBuilderPanel({
   const [builderMode, setBuilderMode] = useState<BuilderMode>('character')
   const [selectedCharacterId, setSelectedCharacterId] = useState('')
   const [selectedLocationId, setSelectedLocationId] = useState('')
+  const [selectedSceneId, setSelectedSceneId] = useState('')
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [selectedStyleGuideId, setSelectedStyleGuideId] = useState('')
+  const [scenes, setScenes] = useState<SceneWithDetails[]>([])
+  const [isLoadingScenes, setIsLoadingScenes] = useState(false)
   const [sceneFields, setSceneFields] =
     useState<ScenePromptFields>(DEFAULT_SCENE_FIELDS)
   const [copyStatus, setCopyStatus] = useState<CopyStatus>({
@@ -99,6 +106,14 @@ export function PromptBuilderPanel({
   }, [locations, selectedLocationId])
 
   useEffect(() => {
+    setIsLoadingScenes(true)
+    getScenesByProject(projectId)
+      .then((data) => setScenes(data))
+      .catch(() => setScenes([]))
+      .finally(() => setIsLoadingScenes(false))
+  }, [projectId])
+
+  useEffect(() => {
     if (currentTemplates.length === 0) {
       setSelectedTemplateId('')
       return
@@ -125,6 +140,7 @@ export function PromptBuilderPanel({
     characters.find((character) => character.id === selectedCharacterId) ?? null
   const selectedLocation =
     locations.find((location) => location.id === selectedLocationId) ?? null
+  const selectedScene = scenes.find((scene) => scene.id === selectedSceneId) ?? null
   const selectedTemplate =
     currentTemplates.find((template) => template.id === selectedTemplateId) ?? null
   const selectedStyleGuide =
@@ -162,6 +178,7 @@ export function PromptBuilderPanel({
         selectedLocation,
         selectedStyleGuide,
         sceneFields,
+        selectedScene,
       ),
     )
   }, [
@@ -169,6 +186,7 @@ export function PromptBuilderPanel({
     sceneFields,
     selectedCharacter,
     selectedLocation,
+    selectedScene,
     selectedStyleGuide,
     selectedTemplate,
   ])
@@ -205,6 +223,7 @@ export function PromptBuilderPanel({
     builderMode,
     selectedCharacter,
     selectedLocation,
+    selectedScene,
   )
 
   const handleSceneFieldChange = (
@@ -215,6 +234,38 @@ export function PromptBuilderPanel({
       ...currentFields,
       [key]: value,
     }))
+  }
+
+  const handleSceneSelectionChange = (nextSceneId: string) => {
+    setSelectedSceneId(nextSceneId)
+
+    const nextScene = scenes.find((scene) => scene.id === nextSceneId) ?? null
+
+    if (!nextScene) {
+      return
+    }
+
+    if (nextScene.character_id) {
+      setSelectedCharacterId(nextScene.character_id)
+    }
+
+    if (nextScene.location_id) {
+      setSelectedLocationId(nextScene.location_id)
+    }
+
+    setSceneFields({
+      action: nextScene.action ?? DEFAULT_SCENE_FIELDS.action,
+      emotion: nextScene.emotion ?? DEFAULT_SCENE_FIELDS.emotion,
+      camera_shot: nextScene.camera_shot ?? DEFAULT_SCENE_FIELDS.camera_shot,
+      camera_angle: nextScene.camera_angle ?? DEFAULT_SCENE_FIELDS.camera_angle,
+      lighting: nextScene.lighting ?? DEFAULT_SCENE_FIELDS.lighting,
+      time_weather: nextScene.time_weather ?? DEFAULT_SCENE_FIELDS.time_weather,
+      additional_notes:
+        nextScene.prompt_summary ??
+        nextScene.description ??
+        DEFAULT_SCENE_FIELDS.additional_notes,
+      negative_notes: nextScene.negative_prompt ?? DEFAULT_SCENE_FIELDS.negative_notes,
+    })
   }
 
   const handleCopy = async (target: CopyTarget, prompt: string) => {
@@ -286,12 +337,14 @@ export function PromptBuilderPanel({
           builderMode === 'location' || builderMode === 'scene'
             ? selectedLocation?.id ?? null
             : null,
+        scene_id: builderMode === 'scene' ? selectedScene?.id ?? null : null,
         positive_prompt: generatedPositivePrompt,
         negative_prompt: generatedNegativePrompt || null,
         input_snapshot: buildInputSnapshot(
           builderMode,
           selectedCharacter,
           selectedLocation,
+          selectedScene,
           selectedStyleGuide,
           selectedTemplate,
           sceneFields,
@@ -344,6 +397,26 @@ export function PromptBuilderPanel({
             options={['character', 'location', 'scene']}
             onChange={(value) => setBuilderMode(value as BuilderMode)}
           />
+
+          {builderMode === 'scene' && (
+            <SelectField
+              label="Scene"
+              value={selectedSceneId}
+              options={['', ...scenes.map((scene) => scene.id)]}
+              optionLabels={{
+                '': isLoadingScenes ? 'Loading scenes...' : 'Manual scene fields',
+                ...Object.fromEntries(
+                  scenes.map((scene) => [
+                    scene.id,
+                    `#${scene.sequence_no} ${scene.title}`,
+                  ]),
+                ),
+              }}
+              onChange={handleSceneSelectionChange}
+              disabled={isLoadingScenes}
+              emptyLabel={isLoadingScenes ? 'Loading scenes...' : 'No scenes'}
+            />
+          )}
 
           {(builderMode === 'character' || builderMode === 'scene') && (
             <SelectField
@@ -435,6 +508,9 @@ export function PromptBuilderPanel({
             title="Selected Data"
             lines={[
               `Mode: ${builderMode}`,
+              ...(builderMode === 'scene'
+                ? [`Scene: ${selectedScene?.title ?? 'Manual scene fields'}`]
+                : []),
               `Subject: ${selectedSubjectName}`,
               `Style: ${selectedStyleGuide?.name ?? 'No style guide'}`,
               `Template: ${selectedTemplate?.name ?? 'No template'}`,
@@ -528,7 +604,7 @@ function SelectField({
       >
         {options.length === 0 && <option value="">{emptyLabel}</option>}
         {options.map((option) => (
-          <option key={option} value={option}>
+          <option key={option || 'empty-option'} value={option}>
             {optionLabels?.[option] ?? option}
           </option>
         ))}
@@ -711,9 +787,11 @@ function getSelectedSubjectName(
   builderMode: BuilderMode,
   character: CharacterWithWorldview | null,
   location: LocationWithWorldview | null,
+  scene: SceneWithDetails | null,
 ) {
   if (builderMode === 'character') return character?.name ?? 'No character'
   if (builderMode === 'location') return location?.name ?? 'No location'
+  if (scene) return `#${scene.sequence_no} ${scene.title}`
   return `${character?.name ?? 'No character'} @ ${location?.name ?? 'No location'}`
 }
 
@@ -758,6 +836,7 @@ function buildInputSnapshot(
   builderMode: BuilderMode,
   character: CharacterWithWorldview | null,
   location: LocationWithWorldview | null,
+  scene: SceneWithDetails | null,
   styleGuide: StyleGuide | null,
   template: PromptTemplate | null,
   sceneFields: ScenePromptFields,
@@ -797,6 +876,16 @@ function buildInputSnapshot(
           atmosphere: location.atmosphere,
           prompt_summary: location.prompt_summary,
           negative_prompt: location.negative_prompt,
+        }
+      : null,
+    scene: scene
+      ? {
+          id: scene.id,
+          sequence_no: scene.sequence_no,
+          title: scene.title,
+          scene_type: scene.scene_type,
+          status: scene.status,
+          prompt_summary: scene.prompt_summary,
         }
       : null,
     scene_fields: builderMode === 'scene' ? sceneFields : null,
@@ -861,10 +950,17 @@ function buildScenePromptValues(
   location: LocationWithWorldview,
   styleGuide: StyleGuide | null,
   sceneFields: ScenePromptFields,
+  scene: SceneWithDetails | null,
 ) {
   return {
     ...buildCharacterPromptValues(character, styleGuide),
     ...buildLocationPromptValues(location, styleGuide),
+    'scene.id': scene?.id ?? '',
+    'scene.sequence_no': scene?.sequence_no ? String(scene.sequence_no) : '',
+    'scene.title': scene?.title ?? '',
+    'scene.type': scene?.scene_type ?? '',
+    'scene.description': scene?.description ?? '',
+    'scene.prompt_summary': scene?.prompt_summary ?? '',
     'scene.action': sceneFields.action,
     'scene.emotion': sceneFields.emotion,
     'scene.camera_shot': sceneFields.camera_shot,
