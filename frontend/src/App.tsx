@@ -10,6 +10,7 @@ import { PromptBuilderPanel } from './components/promptBuilder/PromptBuilderPane
 import { PromptRunCard } from './components/promptRuns/PromptRunCard'
 import { PromptTemplateCard } from './components/promptTemplates/PromptTemplateCard'
 import { RelationshipCard } from './components/relationships/RelationshipCard'
+import { SceneCard } from './components/scenes/SceneCard'
 import { WorldviewCard } from './components/worldviews/WorldviewCard'
 import { AppLayout } from './layouts/AppLayout'
 import type { AppSection } from './layouts/Sidebar'
@@ -46,6 +47,10 @@ import {
   type RelationshipWithCharacters,
 } from './services/relationshipService'
 import {
+  getScenesByProject,
+  type SceneWithDetails,
+} from './services/sceneService'
+import {
   getStyleGuidesByProject,
   type StyleGuide,
 } from './services/styleGuideService'
@@ -63,6 +68,7 @@ function App() {
   const [characters, setCharacters] = useState<CharacterWithWorldview[]>([])
   const [worldviews, setWorldviews] = useState<Worldview[]>([])
   const [locations, setLocations] = useState<LocationWithWorldview[]>([])
+  const [scenes, setScenes] = useState<SceneWithDetails[]>([])
   const [factions, setFactions] = useState<FactionWithWorldview[]>([])
   const [relationships, setRelationships] = useState<RelationshipWithCharacters[]>([])
   const [promptTemplates, setPromptTemplates] = useState<PromptTemplate[]>([])
@@ -76,6 +82,7 @@ function App() {
   const [isLoadingCharacters, setIsLoadingCharacters] = useState(true)
   const [isLoadingWorldviews, setIsLoadingWorldviews] = useState(true)
   const [isLoadingLocations, setIsLoadingLocations] = useState(true)
+  const [isLoadingScenes, setIsLoadingScenes] = useState(true)
   const [isLoadingFactions, setIsLoadingFactions] = useState(true)
   const [isLoadingRelationships, setIsLoadingRelationships] = useState(true)
   const [isLoadingPromptTemplates, setIsLoadingPromptTemplates] = useState(true)
@@ -141,6 +148,11 @@ function App() {
       .catch((error) => setErrorMessage(error.message))
       .finally(() => setIsLoadingLocations(false))
 
+    getScenesByProject(ETERNAL_RIFT_PROJECT_ID)
+      .then((data) => setScenes(data))
+      .catch((error) => setErrorMessage(error.message))
+      .finally(() => setIsLoadingScenes(false))
+
     getFactionsByProject(ETERNAL_RIFT_PROJECT_ID)
       .then((data) => setFactions(data))
       .catch((error) => setErrorMessage(error.message))
@@ -185,6 +197,7 @@ function App() {
           characters={characters}
           worldviews={worldviews}
           locations={locations}
+          scenes={scenes}
           factions={factions}
           relationships={relationships}
           promptTemplates={promptTemplates}
@@ -218,6 +231,14 @@ function App() {
         <LocationsSection
           locations={locations}
           isLoadingLocations={isLoadingLocations}
+          errorMessage={errorMessage}
+        />
+      )}
+
+      {activeSection === 'scenes' && (
+        <ScenesSection
+          scenes={scenes}
+          isLoadingScenes={isLoadingScenes}
           errorMessage={errorMessage}
         />
       )}
@@ -294,6 +315,7 @@ function PageIntro({ activeSection }: PageIntroProps) {
     characters: 'Characters',
     worldviews: 'Worldviews',
     locations: 'Locations',
+    scenes: 'Scenes',
     factions: 'Factions',
     relationships: 'Relationships',
     promptBuilder: 'Prompt Builder',
@@ -310,6 +332,7 @@ function PageIntro({ activeSection }: PageIntroProps) {
     worldviews:
       'Eternal Rift 세계관 규칙, 문명 수준, 시각 톤, 프롬프트 요약을 확인합니다.',
     locations: 'Eternal Rift 장소와 배경 프롬프트 데이터를 확인합니다.',
+    scenes: 'Eternal Rift 장면 구성, 연출 정보, 대표 씬 이미지를 확인합니다.',
     factions: 'Eternal Rift 세력, 조직, 문명 정보를 확인합니다.',
     relationships: 'Eternal Rift 캐릭터 간 관계, 감정선, 갈등 구조를 확인합니다.',
     promptBuilder:
@@ -341,6 +364,7 @@ type OverviewSectionProps = {
   characters: CharacterWithWorldview[]
   worldviews: Worldview[]
   locations: LocationWithWorldview[]
+  scenes: SceneWithDetails[]
   factions: FactionWithWorldview[]
   relationships: RelationshipWithCharacters[]
   promptTemplates: PromptTemplate[]
@@ -356,6 +380,7 @@ function OverviewSection({
   characters,
   worldviews,
   locations,
+  scenes,
   factions,
   relationships,
   promptTemplates,
@@ -372,13 +397,13 @@ function OverviewSection({
         <SummaryCard label="Characters" value={characters.length} />
         <SummaryCard label="Worldviews" value={worldviews.length} />
         <SummaryCard label="Locations" value={locations.length} />
+        <SummaryCard label="Scenes" value={scenes.length} />
         <SummaryCard label="Factions" value={factions.length} />
         <SummaryCard label="Relations" value={relationships.length} />
         <SummaryCard label="Templates" value={promptTemplates.length} />
         <SummaryCard label="Runs" value={promptRuns.length} />
         <SummaryCard label="Assets" value={assets.length} />
         <SummaryCard label="Styles" value={styleGuides.length} />
-        <SummaryCard label="Current MVP" value="Assets" />
       </section>
 
       <section className="mt-8">
@@ -519,6 +544,40 @@ function LocationsSection({
       <div className="grid gap-5">
         {locations.map((location) => (
           <LocationCard key={location.id} location={location} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+type ScenesSectionProps = {
+  scenes: SceneWithDetails[]
+  isLoadingScenes: boolean
+  errorMessage: string | null
+}
+
+function ScenesSection({
+  scenes,
+  isLoadingScenes,
+  errorMessage,
+}: ScenesSectionProps) {
+  return (
+    <section className="mt-8">
+      <SectionHeader
+        title="Scenes"
+        description="Eternal Rift 장면 구성과 대표 이미지를 확인합니다."
+        countLabel={`${scenes.length} scenes`}
+      />
+
+      {isLoadingScenes && <p className="text-slate-400">Loading scenes...</p>}
+
+      {!isLoadingScenes && !errorMessage && scenes.length === 0 && (
+        <EmptyState>조회된 Scene이 없습니다. scenes 테이블에 장면 데이터를 추가하면 이 탭에 표시됩니다.</EmptyState>
+      )}
+
+      <div className="grid gap-5">
+        {scenes.map((scene) => (
+          <SceneCard key={scene.id} scene={scene} />
         ))}
       </div>
     </section>
