@@ -77,6 +77,22 @@ export async function getShotsByScene(sceneId: string): Promise<Shot[]> {
   return data ?? []
 }
 
+export async function getShotsByProject(projectId: string): Promise<Shot[]> {
+  const { data, error } = await supabase
+    .from('shots')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('scene_id', { ascending: true })
+    .order('shot_order', { ascending: true })
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    throw error
+  }
+
+  return data ?? []
+}
+
 export async function createShot(shot: CreateShotInput): Promise<Shot> {
   const { data, error } = await supabase
     .from('shots')
