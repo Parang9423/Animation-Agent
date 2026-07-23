@@ -3,6 +3,7 @@ export type AppSection =
   | 'characters'
   | 'worldviews'
   | 'locations'
+  | 'scenes'
   | 'factions'
   | 'relationships'
   | 'promptBuilder'
@@ -41,6 +42,11 @@ const navItems: NavItem[] = [
     id: 'locations',
     label: 'Locations',
     description: 'Places and backgrounds',
+  },
+  {
+    id: 'scenes',
+    label: 'Scenes',
+    description: 'Story beats and shots',
   },
   {
     id: 'factions',
