@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ApprovedAssetPreview } from '../assets/ApprovedAssetPreview'
 import {
   updateShotStatus,
   type Shot,
@@ -115,6 +116,13 @@ export function ShotCard({ shot, onChanged }: ShotCardProps) {
           {message}
         </p>
       )}
+
+      <ApprovedAssetPreview
+        relatedEntityType="shot"
+        relatedEntityId={currentShot.id}
+        assetType="shot_image"
+        label="Approved Shot Image"
+      />
 
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <InfoBlock label="Action" value={currentShot.action} />
