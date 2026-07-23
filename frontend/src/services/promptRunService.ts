@@ -191,7 +191,7 @@ export async function getPromptRunsByProject(
 }
 
 export async function deletePromptRun(promptRunId: string): Promise<void> {
-  const { error } = supabase.from('prompt_runs').delete().eq('id', promptRunId)
+  const { error } = await supabase.from('prompt_runs').delete().eq('id', promptRunId)
 
   if (error) {
     throw error
