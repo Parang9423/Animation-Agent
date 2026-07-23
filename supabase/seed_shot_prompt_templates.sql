@@ -2,6 +2,24 @@
 -- Run this after supabase/20260723_create_shots_table.sql has been applied.
 -- This file matches the current public.prompt_templates schema.
 
+alter table public.prompt_templates
+  drop constraint if exists prompt_templates_template_type_check;
+
+alter table public.prompt_templates
+  add constraint prompt_templates_template_type_check
+  check (
+    template_type in (
+      'character',
+      'location',
+      'scene',
+      'shot',
+      'worldview',
+      'faction',
+      'relationship',
+      'other'
+    )
+  );
+
 insert into public.prompt_templates (
   project_id,
   name,
