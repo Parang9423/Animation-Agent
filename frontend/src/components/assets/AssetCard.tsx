@@ -6,6 +6,7 @@ import {
   type AssetWithPromptRun,
 } from '../../services/assetService'
 import { updateSceneStatus } from '../../services/sceneService'
+import { updateShotStatus } from '../../services/shotService'
 
 type AssetCardProps = {
   asset: AssetWithPromptRun
@@ -51,12 +52,12 @@ export function AssetCard({ asset, onChanged, onDeleted }: AssetCardProps) {
     try {
       await updateAssetStatus(asset.id, nextStatus)
 
-      const sceneAutoApprovalMessage = await maybeApproveLinkedScene(asset, nextStatus)
+      const linkedEntityMessage = await maybeApproveLinkedEntity(asset, nextStatus)
 
       setStatusSaveState('saved')
       setStatusMessage(
-        sceneAutoApprovalMessage
-          ? `Status updated to ${nextStatus}. ${sceneAutoApprovalMessage}`
+        linkedEntityMessage
+          ? `Status updated to ${nextStatus}. ${linkedEntityMessage}`
           : `Status updated to ${nextStatus}`,
       )
       onChanged?.()
@@ -161,7 +162,7 @@ export function AssetCard({ asset, onChanged, onDeleted }: AssetCardProps) {
           <div>
             <p className="text-sm font-semibold text-slate-300">Asset Status</p>
             <p className="mt-1 text-xs text-slate-500">
-              후보/승인/폐기/보관 상태를 즉시 변경합니다. Scene 이미지 승인 시 Scene status도 approved로 자동 갱신됩니다.
+              후보/승인/폐기/보관 상태를 즉시 변경합니다. Scene 또는 Shot 이미지 승인 시 연결된 제작 단위도 approved로 자동 갱신됩니다.
             </p>
           </div>
 
@@ -263,23 +264,25 @@ function InfoBlock({ label, value }: InfoBlockProps) {
   )
 }
 
-async function maybeApproveLinkedScene(
+async function maybeApproveLinkedEntity(
   asset: AssetWithPromptRun,
   nextStatus: AssetStatus,
 ) {
-  const shouldApproveLinkedScene =
-    nextStatus === 'approved' &&
-    asset.asset_type === 'scene_image' &&
-    asset.related_entity_type === 'scene' &&
-    Boolean(asset.related_entity_id)
-
-  if (!shouldApproveLinkedScene || !asset.related_entity_id) {
+  if (nextStatus !== 'approved' || !asset.related_entity_id) {
     return null
   }
 
-  await updateSceneStatus(asset.related_entity_id, 'approved')
+  if (asset.asset_type === 'scene_image' && asset.related_entity_type === 'scene') {
+    await updateSceneStatus(asset.related_entity_id, 'approved')
+    return 'Linked Scene status updated to approved.'
+  }
 
-  return 'Linked Scene status updated to approved.'
+  if (asset.asset_type === 'shot_image' && asset.related_entity_type === 'shot') {
+    await updateShotStatus(asset.related_entity_id, 'approved')
+    return 'Linked Shot status updated to approved.'
+  }
+
+  return null
 }
 
 function getPromptRunSubject(asset: AssetWithPromptRun) {
@@ -287,8 +290,20 @@ function getPromptRunSubject(asset: AssetWithPromptRun) {
     return `${asset.related_entity_type ?? 'Unlinked'} asset`
   }
 
+  const shotTitle = asset.prompt_runs.shots?.title
+  const shotOrder = asset.prompt_runs.shots?.shot_order
+  const sceneTitle = asset.prompt_runs.scenes?.title
+  const sceneSequenceNo = asset.prompt_runs.scenes?.sequence_no
   const characterName = asset.prompt_runs.characters?.name
   const locationName = asset.prompt_runs.locations?.name
+
+  if (shotTitle) {
+    return `Shot #${shotOrder ?? '-'} ${shotTitle}`
+  }
+
+  if (sceneTitle) {
+    return `Scene #${sceneSequenceNo ?? '-'} ${sceneTitle}`
+  }
 
   if (characterName && locationName) {
     return `${characterName} @ ${locationName}`
