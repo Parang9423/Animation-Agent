@@ -32,6 +32,14 @@ export type AssetWithPromptRun = Asset & {
     locations: {
       name: string
     } | null
+    scenes: {
+      title: string
+      sequence_no: number | null
+    } | null
+    shots: {
+      title: string
+      shot_order: number | null
+    } | null
   } | null
 }
 
@@ -90,6 +98,14 @@ export async function getAssetsByProject(
         ),
         locations (
           name
+        ),
+        scenes (
+          title,
+          sequence_no
+        ),
+        shots (
+          title,
+          shot_order
         )
       )
     `,
