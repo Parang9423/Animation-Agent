@@ -23,13 +23,13 @@ export function ApprovedAssetPreview({
 }: ApprovedAssetPreviewProps) {
   const [asset, setAsset] = useState<Asset | null>(null)
   const [loadState, setLoadState] = useState<LoadState>('idle')
-  const [imageFailed, setImageFailed] = useState(false)
+  const [mediaFailed, setMediaFailed] = useState(false)
 
   useEffect(() => {
     let isMounted = true
 
     setLoadState('loading')
-    setImageFailed(false)
+    setMediaFailed(false)
 
     getApprovedAssetByEntity({
       relatedEntityType,
@@ -55,18 +55,20 @@ export function ApprovedAssetPreview({
   if (loadState === 'loading') {
     return (
       <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950 p-4 text-sm text-slate-500">
-        대표 이미지를 불러오는 중...
+        대표 에셋을 불러오는 중...
       </div>
     )
   }
 
-  if (!asset?.external_url || imageFailed) {
+  if (!asset?.external_url || mediaFailed) {
     return compact ? null : (
       <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950 p-4 text-sm text-slate-500">
-        승인된 대표 이미지가 없습니다.
+        승인된 대표 에셋이 없습니다.
       </div>
     )
   }
+
+  const isVideo = isVideoAsset(asset.asset_type, asset.external_url)
 
   return (
     <div className="mt-4 overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
@@ -80,13 +82,26 @@ export function ApprovedAssetPreview({
       </div>
 
       <div className={compact ? 'h-48 bg-slate-950' : 'h-80 bg-slate-950'}>
-        <img
-          src={asset.external_url}
-          alt={`${relatedEntityType} approved asset`}
-          onError={() => setImageFailed(true)}
-          className="h-full w-full object-cover"
-        />
+        {isVideo ? (
+          <video
+            src={asset.external_url}
+            controls
+            onError={() => setMediaFailed(true)}
+            className="h-full w-full bg-black object-contain"
+          />
+        ) : (
+          <img
+            src={asset.external_url}
+            alt={`${relatedEntityType} approved asset`}
+            onError={() => setMediaFailed(true)}
+            className="h-full w-full object-cover"
+          />
+        )}
       </div>
     </div>
   )
+}
+
+function isVideoAsset(assetType: string | null, url: string) {
+  return assetType === 'video' || /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(url)
 }
