@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import type { ProductionBoardRow } from '../../services/productionBoardService'
 
+const QUICK_ACTION_BANNER_ID = 'production-quick-action-banner'
+
 type ProductionBoardPanelProps = {
   rows: ProductionBoardRow[]
   isLoading: boolean
@@ -9,6 +11,7 @@ type ProductionBoardPanelProps = {
 }
 
 type StatusFilter = 'all' | ProductionBoardRow['progressStage']
+type QuickActionSection = 'promptBuilder' | 'assets' | 'scenes'
 
 const STATUS_FILTERS: StatusFilter[] = [
   'all',
@@ -44,6 +47,13 @@ export function ProductionBoardPanel({
 
   const groupedRows = useMemo(() => groupRowsByScene(filteredRows), [filteredRows])
   const summary = useMemo(() => buildSummary(rows), [rows])
+
+  const handleQuickAction = (row: ProductionBoardRow) => {
+    const quickAction = getQuickAction(row)
+
+    showQuickActionBanner(row, quickAction.section, quickAction.guidance)
+    navigateToSection(quickAction.section)
+  }
 
   return (
     <section className="mt-8">
@@ -127,7 +137,11 @@ export function ProductionBoardPanel({
 
       <div className="mt-6 grid gap-5">
         {groupedRows.map((group) => (
-          <SceneProductionGroup key={group.sceneKey} group={group} />
+          <SceneProductionGroup
+            key={group.sceneKey}
+            group={group}
+            onQuickAction={handleQuickAction}
+          />
         ))}
       </div>
     </section>
@@ -141,7 +155,13 @@ type SceneGroup = {
   rows: ProductionBoardRow[]
 }
 
-function SceneProductionGroup({ group }: { group: SceneGroup }) {
+function SceneProductionGroup({
+  group,
+  onQuickAction,
+}: {
+  group: SceneGroup
+  onQuickAction: (row: ProductionBoardRow) => void
+}) {
   return (
     <article className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -159,7 +179,7 @@ function SceneProductionGroup({ group }: { group: SceneGroup }) {
       </div>
 
       <div className="mt-5 overflow-x-auto">
-        <table className="w-full min-w-[980px] border-separate border-spacing-y-2 text-left text-sm">
+        <table className="w-full min-w-[1120px] border-separate border-spacing-y-2 text-left text-sm">
           <thead className="text-xs uppercase tracking-wide text-slate-500">
             <tr>
               <th className="px-3 py-2">Shot</th>
@@ -168,11 +188,16 @@ function SceneProductionGroup({ group }: { group: SceneGroup }) {
               <th className="px-3 py-2">Video Prompt</th>
               <th className="px-3 py-2">Video</th>
               <th className="px-3 py-2">Next Action</th>
+              <th className="px-3 py-2">Quick Action</th>
             </tr>
           </thead>
           <tbody>
             {group.rows.map((row) => (
-              <ProductionBoardTableRow key={row.id} row={row} />
+              <ProductionBoardTableRow
+                key={row.id}
+                row={row}
+                onQuickAction={onQuickAction}
+              />
             ))}
           </tbody>
         </table>
@@ -181,7 +206,15 @@ function SceneProductionGroup({ group }: { group: SceneGroup }) {
   )
 }
 
-function ProductionBoardTableRow({ row }: { row: ProductionBoardRow }) {
+function ProductionBoardTableRow({
+  row,
+  onQuickAction,
+}: {
+  row: ProductionBoardRow
+  onQuickAction: (row: ProductionBoardRow) => void
+}) {
+  const quickAction = getQuickAction(row)
+
   return (
     <tr className="rounded-xl bg-slate-950 align-top">
       <td className="rounded-l-xl px-3 py-3">
@@ -222,8 +255,20 @@ function ProductionBoardTableRow({ row }: { row: ProductionBoardRow }) {
       <td className="px-3 py-3">
         <ReadyBadge isReady={row.hasApprovedVideo} readyLabel="ready" missingLabel="missing" />
       </td>
-      <td className="rounded-r-xl px-3 py-3">
+      <td className="px-3 py-3">
         <p className="max-w-xs text-sm text-slate-300">{row.nextAction}</p>
+      </td>
+      <td className="rounded-r-xl px-3 py-3">
+        <button
+          type="button"
+          onClick={() => onQuickAction(row)}
+          className="rounded-xl border border-cyan-800 bg-cyan-950 px-3 py-2 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-900"
+        >
+          {quickAction.buttonLabel}
+        </button>
+        <p className="mt-2 max-w-40 text-xs leading-5 text-slate-500">
+          {quickAction.targetLabel}
+        </p>
       </td>
     </tr>
   )
@@ -306,6 +351,110 @@ function groupRowsByScene(rows: ProductionBoardRow[]): SceneGroup[] {
 
     return firstSequence - secondSequence
   })
+}
+
+function getQuickAction(row: ProductionBoardRow): {
+  section: QuickActionSection
+  buttonLabel: string
+  targetLabel: string
+  guidance: string
+} {
+  if (row.progressStage === 'prompt') {
+    return {
+      section: 'promptBuilder',
+      buttonLabel: 'Build Image Prompt',
+      targetLabel: 'Open Prompt Builder',
+      guidance: 'Shot 모드에서 이 Shot을 선택한 뒤 이미지 프롬프트를 생성/저장하세요.',
+    }
+  }
+
+  if (row.progressStage === 'image') {
+    return {
+      section: 'assets',
+      buttonLabel: 'Upload Image Asset',
+      targetLabel: 'Open Assets',
+      guidance: '생성된 Shot 이미지를 업로드하고 candidate 또는 approved 상태로 저장하세요.',
+    }
+  }
+
+  if (row.progressStage === 'video_prompt') {
+    return {
+      section: 'promptBuilder',
+      buttonLabel: 'Build Video Prompt',
+      targetLabel: 'Open Prompt Builder',
+      guidance: 'Shot 모드에서 video 템플릿을 선택하고 identity-lock 비디오 프롬프트를 생성/저장하세요.',
+    }
+  }
+
+  if (row.progressStage === 'video') {
+    return {
+      section: 'assets',
+      buttonLabel: 'Upload Video Asset',
+      targetLabel: 'Open Assets',
+      guidance: 'Google Flow에서 생성한 Shot 영상을 video asset으로 업로드하고 approved 처리하세요.',
+    }
+  }
+
+  return {
+    section: 'scenes',
+    buttonLabel: 'View Scene',
+    targetLabel: 'Open Scenes',
+    guidance: '해당 Scene의 ShotCard에서 승인 이미지와 승인 영상을 최종 확인하세요.',
+  }
+}
+
+function navigateToSection(section: QuickActionSection) {
+  const sectionLabelMap: Record<QuickActionSection, string> = {
+    promptBuilder: 'Prompt Builder',
+    assets: 'Assets',
+    scenes: 'Scenes',
+  }
+  const targetLabel = sectionLabelMap[section]
+  const targetButton = Array.from(document.querySelectorAll('button')).find((button) =>
+    button.textContent?.includes(targetLabel),
+  )
+
+  targetButton?.click()
+}
+
+function showQuickActionBanner(
+  row: ProductionBoardRow,
+  section: QuickActionSection,
+  guidance: string,
+) {
+  document.getElementById(QUICK_ACTION_BANNER_ID)?.remove()
+
+  const sectionLabelMap: Record<QuickActionSection, string> = {
+    promptBuilder: 'Prompt Builder',
+    assets: 'Assets',
+    scenes: 'Scenes',
+  }
+
+  const banner = document.createElement('div')
+  banner.id = QUICK_ACTION_BANNER_ID
+  banner.className =
+    'fixed right-6 top-6 z-50 max-w-xl rounded-2xl border border-cyan-700 bg-slate-950 px-5 py-4 text-sm text-slate-200 shadow-2xl shadow-black/40'
+
+  const title = document.createElement('p')
+  title.className = 'font-semibold text-cyan-100'
+  title.textContent = `작업 대상: Scene #${row.scenes?.sequence_no ?? '-'} / Shot #${row.shot_order} ${row.title}`
+
+  const body = document.createElement('p')
+  body.className = 'mt-2 leading-6 text-slate-300'
+  body.textContent = `${sectionLabelMap[section]}로 이동했습니다. ${guidance}`
+
+  const closeButton = document.createElement('button')
+  closeButton.type = 'button'
+  closeButton.className = 'mt-3 text-xs font-semibold text-cyan-300 hover:text-cyan-100'
+  closeButton.textContent = 'Dismiss'
+  closeButton.onclick = () => banner.remove()
+
+  banner.append(title, body, closeButton)
+  document.body.appendChild(banner)
+
+  window.setTimeout(() => {
+    banner.remove()
+  }, 8000)
 }
 
 function getStageBadgeClassName(stage: ProductionBoardRow['progressStage']) {
