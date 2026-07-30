@@ -122,8 +122,14 @@ export function ShotCard({ shot, onChanged }: ShotCardProps) {
         relatedEntityId={currentShot.id}
         assetType="shot_image"
         label="Approved Shot Image"
+        showDownload
+        downloadLabel="Download Reference Image"
+        downloadFileName={`shot-${currentShot.shot_order}-${currentShot.id.slice(
+          0,
+          8,
+        )}-reference.png`}
         showCopyUrl
-        copyUrlLabel="Copy Image URL"
+        copyUrlLabel="Copy URL"
       />
 
       <ApprovedAssetPreview
