@@ -124,6 +124,13 @@ export function ShotCard({ shot, onChanged }: ShotCardProps) {
         label="Approved Shot Image"
       />
 
+      <ApprovedAssetPreview
+        relatedEntityType="shot"
+        relatedEntityId={currentShot.id}
+        assetType="video"
+        label="Approved Shot Video"
+      />
+
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <InfoBlock label="Action" value={currentShot.action} />
         <InfoBlock label="Emotion" value={currentShot.emotion} />
