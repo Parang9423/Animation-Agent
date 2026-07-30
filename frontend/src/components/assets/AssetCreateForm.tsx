@@ -91,28 +91,27 @@ export function AssetCreateForm({
       return
     }
 
+    const inferredAssetType = inferAssetTypeFromPromptRun(nextPromptRun)
+
     setPromptUsed(nextPromptRun.positive_prompt)
+    setAssetType(inferredAssetType)
 
     if (nextPromptRun.prompt_type === 'character') {
-      setAssetType('character_image')
       setRelatedEntityType('character')
       setRelatedEntityId(nextPromptRun.character_id ?? '')
     }
 
     if (nextPromptRun.prompt_type === 'location') {
-      setAssetType('location_image')
       setRelatedEntityType('location')
       setRelatedEntityId(nextPromptRun.location_id ?? '')
     }
 
     if (nextPromptRun.prompt_type === 'scene') {
-      setAssetType('scene_image')
       setRelatedEntityType('scene')
       setRelatedEntityId(nextPromptRun.scene_id ?? '')
     }
 
     if (nextPromptRun.prompt_type === 'shot') {
-      setAssetType('shot_image')
       setRelatedEntityType('shot')
       setRelatedEntityId(nextPromptRun.shot_id ?? '')
     }
@@ -122,6 +121,8 @@ export function AssetCreateForm({
         {
           prompt_run_id: nextPromptRun.id,
           prompt_type: nextPromptRun.prompt_type,
+          prompt_template_name: nextPromptRun.prompt_templates?.name ?? null,
+          asset_output_kind: inferredAssetType === 'video' ? 'video' : 'image',
           character_id: nextPromptRun.character_id,
           character_name: nextPromptRun.characters?.name ?? null,
           location_id: nextPromptRun.location_id,
@@ -147,6 +148,13 @@ export function AssetCreateForm({
       return
     }
 
+    const uploadAssetType = isVideoFile(file) ? 'video' : assetType
+
+    if (uploadAssetType !== assetType) {
+      setAssetType(uploadAssetType)
+      mergeMetadata({ asset_output_kind: 'video' })
+    }
+
     setSelectedFileName(file.name)
     setUploadStatus({ status: 'uploading', message: 'Uploading file...' })
 
@@ -154,7 +162,7 @@ export function AssetCreateForm({
       const uploadedFile = await uploadAssetFile({
         file,
         projectSlug: PROJECT_SLUG,
-        assetType,
+        assetType: uploadAssetType,
         promptRunId,
       })
 
@@ -166,6 +174,7 @@ export function AssetCreateForm({
         message: `Uploaded to ${uploadedFile.storage_path}`,
       })
       mergeMetadata({
+        asset_output_kind: uploadAssetType === 'video' ? 'video' : 'image',
         storage_bucket: uploadedFile.bucket,
         uploaded_file_name: file.name,
         uploaded_file_size: file.size,
@@ -370,7 +379,7 @@ export function AssetCreateForm({
             Upload Asset File
           </span>
           <p className="mt-1 text-xs text-slate-500">
-            Google Flow에서 다운로드한 이미지/영상 파일을 Supabase Storage assets bucket에 업로드합니다.
+            Google Flow에서 다운로드한 이미지/영상 파일을 Supabase Storage assets bucket에 업로드합니다. 영상 파일을 선택하면 asset_type은 video로 자동 전환됩니다.
           </p>
           <input
             type="file"
@@ -482,5 +491,39 @@ function getPromptRunLabel(promptRun: PromptRunWithDetails) {
           ? `${characterName} @ ${locationName}`
           : characterName ?? locationName ?? promptRun.prompt_type)
 
-  return `${subject} · ${promptRun.output_status} · ${promptRun.id.slice(0, 8)}`
+  return `${subject} · ${getPromptRunOutputLabel(promptRun)} · ${promptRun.output_status} · ${promptRun.id.slice(0, 8)}`
+}
+
+function getPromptRunOutputLabel(promptRun: PromptRunWithDetails) {
+  if (promptRun.prompt_type === 'shot') {
+    return isShotVideoPromptRun(promptRun) ? 'video prompt' : 'image prompt'
+  }
+
+  return promptRun.prompt_type
+}
+
+function inferAssetTypeFromPromptRun(promptRun: PromptRunWithDetails) {
+  if (promptRun.prompt_type === 'character') return 'character_image'
+  if (promptRun.prompt_type === 'location') return 'location_image'
+  if (promptRun.prompt_type === 'scene') return 'scene_image'
+  if (promptRun.prompt_type === 'shot') {
+    return isShotVideoPromptRun(promptRun) ? 'video' : 'shot_image'
+  }
+
+  return 'other'
+}
+
+function isShotVideoPromptRun(promptRun: PromptRunWithDetails) {
+  const templateName = promptRun.prompt_templates?.name?.toLowerCase() ?? ''
+  const positivePrompt = promptRun.positive_prompt.toLowerCase()
+
+  return (
+    templateName.includes('video') ||
+    positivePrompt.includes('video shot') ||
+    positivePrompt.includes('video direction')
+  )
+}
+
+function isVideoFile(file: File) {
+  return file.type.startsWith('video/') || /\.(mp4|mov|webm|m4v)$/i.test(file.name)
 }
