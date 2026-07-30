@@ -122,6 +122,8 @@ export function ShotCard({ shot, onChanged }: ShotCardProps) {
         relatedEntityId={currentShot.id}
         assetType="shot_image"
         label="Approved Shot Image"
+        showCopyUrl
+        copyUrlLabel="Copy Image URL"
       />
 
       <ApprovedAssetPreview
