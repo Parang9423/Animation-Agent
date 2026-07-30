@@ -35,12 +35,18 @@ export function AssetCard({ asset, onChanged, onDeleted }: AssetCardProps) {
   const [deleteState, setDeleteState] = useState<DeleteState>('idle')
   const [deleteMessage, setDeleteMessage] = useState<string | null>(null)
   const [isDeleted, setIsDeleted] = useState(false)
-  const [imageFailed, setImageFailed] = useState(false)
+  const [mediaFailed, setMediaFailed] = useState(false)
 
   const shouldShowImagePreview =
     Boolean(asset.external_url) &&
-    !imageFailed &&
+    !mediaFailed &&
+    !isVideoAsset(asset.asset_type, asset.external_url ?? '') &&
     (isLikelyImageUrl(asset.external_url ?? '') || isImageAsset(asset.asset_type))
+
+  const shouldShowVideoPreview =
+    Boolean(asset.external_url) &&
+    !mediaFailed &&
+    isVideoAsset(asset.asset_type, asset.external_url ?? '')
 
   const handleStatusChange = async (nextStatus: AssetStatus) => {
     const previousStatus = currentStatus
@@ -162,7 +168,7 @@ export function AssetCard({ asset, onChanged, onDeleted }: AssetCardProps) {
           <div>
             <p className="text-sm font-semibold text-slate-300">Asset Status</p>
             <p className="mt-1 text-xs text-slate-500">
-              후보/승인/폐기/보관 상태를 즉시 변경합니다. Scene 또는 Shot 이미지 승인 시 연결된 제작 단위도 approved로 자동 갱신됩니다.
+              후보/승인/폐기/보관 상태를 즉시 변경합니다. Scene 또는 Shot 에셋 승인 시 연결된 제작 단위도 자동 갱신됩니다.
             </p>
           </div>
 
@@ -202,15 +208,26 @@ export function AssetCard({ asset, onChanged, onDeleted }: AssetCardProps) {
           <img
             src={asset.external_url ?? ''}
             alt={promptRunSubject}
-            onError={() => setImageFailed(true)}
+            onError={() => setMediaFailed(true)}
             className="max-h-[420px] w-full object-contain"
           />
         </div>
       )}
 
-      {asset.external_url && imageFailed && (
+      {shouldShowVideoPreview && (
+        <div className="mt-5 overflow-hidden rounded-xl border border-slate-800 bg-black">
+          <video
+            src={asset.external_url ?? ''}
+            controls
+            onError={() => setMediaFailed(true)}
+            className="max-h-[520px] w-full object-contain"
+          />
+        </div>
+      )}
+
+      {asset.external_url && mediaFailed && (
         <div className="mt-5 rounded-xl border border-yellow-800 bg-yellow-950/20 p-4 text-sm text-yellow-100">
-          이미지 미리보기를 불러오지 못했습니다. 외부 링크 접근 권한 또는 URL 만료 여부를 확인하세요.
+          미리보기를 불러오지 못했습니다. 외부 링크 접근 권한 또는 URL 만료 여부를 확인하세요.
         </div>
       )}
 
@@ -282,6 +299,11 @@ async function maybeApproveLinkedEntity(
     return 'Linked Shot status updated to approved.'
   }
 
+  if (asset.asset_type === 'video' && asset.related_entity_type === 'shot') {
+    await updateShotStatus(asset.related_entity_id, 'video_generated')
+    return 'Linked Shot status updated to video_generated.'
+  }
+
   return null
 }
 
@@ -345,6 +367,10 @@ function getStatusBadgeClassName(status: AssetStatus) {
 
 function isImageAsset(assetType: string | null) {
   return Boolean(assetType?.toLowerCase().includes('image'))
+}
+
+function isVideoAsset(assetType: string | null, url: string) {
+  return assetType === 'video' || /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(url)
 }
 
 function isLikelyImageUrl(url: string) {
