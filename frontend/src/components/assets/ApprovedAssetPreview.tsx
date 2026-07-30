@@ -12,10 +12,14 @@ type ApprovedAssetPreviewProps = {
   compact?: boolean
   showCopyUrl?: boolean
   copyUrlLabel?: string
+  showDownload?: boolean
+  downloadLabel?: string
+  downloadFileName?: string
 }
 
 type LoadState = 'idle' | 'loading' | 'loaded' | 'failed'
 type CopyState = 'idle' | 'copied' | 'failed'
+type DownloadState = 'idle' | 'downloading' | 'downloaded' | 'failed'
 
 export function ApprovedAssetPreview({
   relatedEntityType,
@@ -25,11 +29,15 @@ export function ApprovedAssetPreview({
   compact = false,
   showCopyUrl = false,
   copyUrlLabel = 'Copy URL',
+  showDownload = false,
+  downloadLabel = 'Download Asset',
+  downloadFileName,
 }: ApprovedAssetPreviewProps) {
   const [asset, setAsset] = useState<Asset | null>(null)
   const [loadState, setLoadState] = useState<LoadState>('idle')
   const [mediaFailed, setMediaFailed] = useState(false)
   const [copyState, setCopyState] = useState<CopyState>('idle')
+  const [downloadState, setDownloadState] = useState<DownloadState>('idle')
 
   useEffect(() => {
     let isMounted = true
@@ -37,6 +45,7 @@ export function ApprovedAssetPreview({
     setLoadState('loading')
     setMediaFailed(false)
     setCopyState('idle')
+    setDownloadState('idle')
 
     getApprovedAssetByEntity({
       relatedEntityType,
@@ -72,6 +81,40 @@ export function ApprovedAssetPreview({
     }
   }
 
+  const handleDownloadAsset = async () => {
+    if (!asset?.external_url) return
+
+    setDownloadState('downloading')
+
+    try {
+      const response = await fetch(asset.external_url)
+
+      if (!response.ok) {
+        throw new Error(`Failed to download asset: ${response.status}`)
+      }
+
+      const blob = await response.blob()
+      const objectUrl = window.URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+
+      anchor.href = objectUrl
+      anchor.download =
+        downloadFileName ??
+        buildDownloadFileName(asset, response.headers.get('content-type'))
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      window.URL.revokeObjectURL(objectUrl)
+
+      setDownloadState('downloaded')
+      window.setTimeout(() => setDownloadState('idle'), 2000)
+    } catch {
+      setDownloadState('failed')
+      window.open(asset.external_url, '_blank', 'noopener,noreferrer')
+      window.setTimeout(() => setDownloadState('idle'), 3000)
+    }
+  }
+
   if (loadState === 'loading') {
     return (
       <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950 p-4 text-sm text-slate-500">
@@ -102,18 +145,39 @@ export function ApprovedAssetPreview({
           </span>
         </div>
 
-        {showCopyUrl && (
-          <button
-            type="button"
-            onClick={handleCopyUrl}
-            className="rounded-lg border border-cyan-800 bg-cyan-950 px-3 py-1.5 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-900"
-          >
-            {copyState === 'copied'
-              ? 'Copied'
-              : copyState === 'failed'
-                ? 'Copy Failed'
-                : copyUrlLabel}
-          </button>
+        {(showDownload || showCopyUrl) && (
+          <div className="flex flex-wrap justify-end gap-2">
+            {showDownload && (
+              <button
+                type="button"
+                onClick={handleDownloadAsset}
+                disabled={downloadState === 'downloading'}
+                className="rounded-lg border border-emerald-800 bg-emerald-950 px-3 py-1.5 text-xs font-semibold text-emerald-100 transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:border-slate-800 disabled:bg-slate-950 disabled:text-slate-600"
+              >
+                {downloadState === 'downloading'
+                  ? 'Downloading...'
+                  : downloadState === 'downloaded'
+                    ? 'Downloaded'
+                    : downloadState === 'failed'
+                      ? 'Opened Source'
+                      : downloadLabel}
+              </button>
+            )}
+
+            {showCopyUrl && (
+              <button
+                type="button"
+                onClick={handleCopyUrl}
+                className="rounded-lg border border-cyan-800 bg-cyan-950 px-3 py-1.5 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-900"
+              >
+                {copyState === 'copied'
+                  ? 'Copied'
+                  : copyState === 'failed'
+                    ? 'Copy Failed'
+                    : copyUrlLabel}
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -135,11 +199,16 @@ export function ApprovedAssetPreview({
         )}
       </div>
 
-      {showCopyUrl && (
+      {(showDownload || showCopyUrl) && (
         <div className="border-t border-slate-800 px-4 py-3">
-          <p className="break-all text-xs leading-5 text-slate-500">
-            {asset.external_url}
+          <p className="text-xs leading-5 text-slate-500">
+            Google Flow reference/start image에는 URL 텍스트가 아니라 다운로드한 이미지 파일을 직접 업로드하세요.
           </p>
+          {showCopyUrl && (
+            <p className="mt-2 break-all text-xs leading-5 text-slate-600">
+              {asset.external_url}
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -148,4 +217,34 @@ export function ApprovedAssetPreview({
 
 function isVideoAsset(assetType: string | null, url: string) {
   return assetType === 'video' || /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(url)
+}
+
+function buildDownloadFileName(asset: Asset, contentType: string | null) {
+  const extension = getDownloadExtension(asset.external_url, contentType, asset.asset_type)
+  const entityType = asset.related_entity_type ?? 'asset'
+  const entityId = asset.related_entity_id?.slice(0, 8) ?? asset.id.slice(0, 8)
+
+  return `${entityType}-${entityId}-${asset.asset_type ?? 'approved'}.${extension}`
+}
+
+function getDownloadExtension(
+  url: string | null,
+  contentType: string | null,
+  assetType: string | null,
+) {
+  const extensionFromUrl = url?.match(/\.([a-z0-9]+)(?:\?.*)?$/i)?.[1]
+
+  if (extensionFromUrl) {
+    return extensionFromUrl.toLowerCase()
+  }
+
+  if (contentType?.includes('png')) return 'png'
+  if (contentType?.includes('jpeg') || contentType?.includes('jpg')) return 'jpg'
+  if (contentType?.includes('webp')) return 'webp'
+  if (contentType?.includes('gif')) return 'gif'
+  if (contentType?.includes('mp4')) return 'mp4'
+  if (contentType?.includes('webm')) return 'webm'
+  if (contentType?.includes('quicktime')) return 'mov'
+
+  return assetType === 'video' ? 'mp4' : 'png'
 }
