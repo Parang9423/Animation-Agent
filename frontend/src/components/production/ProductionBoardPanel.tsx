@@ -12,6 +12,15 @@ type ProductionBoardPanelProps = {
 
 type StatusFilter = 'all' | ProductionBoardRow['progressStage']
 type QuickActionSection = 'promptBuilder' | 'assets' | 'scenes'
+type QuickActionOutputKind = 'image' | 'video' | 'none'
+
+type QuickAction = {
+  section: QuickActionSection
+  outputKind: QuickActionOutputKind
+  buttonLabel: string
+  targetLabel: string
+  guidance: string
+}
 
 const STATUS_FILTERS: StatusFilter[] = [
   'all',
@@ -53,6 +62,7 @@ export function ProductionBoardPanel({
 
     showQuickActionBanner(row, quickAction.section, quickAction.guidance)
     navigateToSection(quickAction.section)
+    scheduleQuickActionAutoSelection(row, quickAction)
   }
 
   return (
@@ -353,50 +363,50 @@ function groupRowsByScene(rows: ProductionBoardRow[]): SceneGroup[] {
   })
 }
 
-function getQuickAction(row: ProductionBoardRow): {
-  section: QuickActionSection
-  buttonLabel: string
-  targetLabel: string
-  guidance: string
-} {
+function getQuickAction(row: ProductionBoardRow): QuickAction {
   if (row.progressStage === 'prompt') {
     return {
       section: 'promptBuilder',
+      outputKind: 'image',
       buttonLabel: 'Build Image Prompt',
-      targetLabel: 'Open Prompt Builder',
-      guidance: 'Shot 모드에서 이 Shot을 선택한 뒤 이미지 프롬프트를 생성/저장하세요.',
+      targetLabel: 'Auto-select in Prompt Builder',
+      guidance: 'Shot 모드, 대상 Shot, image 템플릿을 자동 선택합니다. 프롬프트를 생성/저장하세요.',
     }
   }
 
   if (row.progressStage === 'image') {
     return {
       section: 'assets',
+      outputKind: 'image',
       buttonLabel: 'Upload Image Asset',
-      targetLabel: 'Open Assets',
-      guidance: '생성된 Shot 이미지를 업로드하고 candidate 또는 approved 상태로 저장하세요.',
+      targetLabel: 'Auto-select in Assets',
+      guidance: '해당 Shot의 image prompt run을 자동 선택합니다. 생성된 Shot 이미지를 업로드하세요.',
     }
   }
 
   if (row.progressStage === 'video_prompt') {
     return {
       section: 'promptBuilder',
+      outputKind: 'video',
       buttonLabel: 'Build Video Prompt',
-      targetLabel: 'Open Prompt Builder',
-      guidance: 'Shot 모드에서 video 템플릿을 선택하고 identity-lock 비디오 프롬프트를 생성/저장하세요.',
+      targetLabel: 'Auto-select in Prompt Builder',
+      guidance: 'Shot 모드, 대상 Shot, video 템플릿을 자동 선택합니다. identity-lock 비디오 프롬프트를 생성/저장하세요.',
     }
   }
 
   if (row.progressStage === 'video') {
     return {
       section: 'assets',
+      outputKind: 'video',
       buttonLabel: 'Upload Video Asset',
-      targetLabel: 'Open Assets',
-      guidance: 'Google Flow에서 생성한 Shot 영상을 video asset으로 업로드하고 approved 처리하세요.',
+      targetLabel: 'Auto-select in Assets',
+      guidance: '해당 Shot의 video prompt run을 자동 선택합니다. Google Flow에서 생성한 영상을 업로드하세요.',
     }
   }
 
   return {
     section: 'scenes',
+    outputKind: 'none',
     buttonLabel: 'View Scene',
     targetLabel: 'Open Scenes',
     guidance: '해당 Scene의 ShotCard에서 승인 이미지와 승인 영상을 최종 확인하세요.',
@@ -415,6 +425,138 @@ function navigateToSection(section: QuickActionSection) {
   )
 
   targetButton?.click()
+}
+
+function scheduleQuickActionAutoSelection(row: ProductionBoardRow, quickAction: QuickAction) {
+  if (quickAction.section === 'scenes') return
+
+  let attemptCount = 0
+  const maxAttempts = 16
+
+  const tryApply = () => {
+    attemptCount += 1
+
+    const didApply =
+      quickAction.section === 'promptBuilder'
+        ? applyPromptBuilderTarget(row, quickAction.outputKind)
+        : applyAssetFormTarget(row, quickAction.outputKind)
+
+    if (!didApply && attemptCount < maxAttempts) {
+      window.setTimeout(tryApply, 250)
+    }
+  }
+
+  window.setTimeout(tryApply, 300)
+}
+
+function applyPromptBuilderTarget(
+  row: ProductionBoardRow,
+  outputKind: QuickActionOutputKind,
+) {
+  const modeApplied = setSelectValueByLabel('Template Type', 'shot')
+  const shotApplied = setSelectValueByLabel('Shot', row.id)
+  const templateApplied = setSelectOptionByLabelText('Prompt Template', outputKind)
+
+  return modeApplied && shotApplied && templateApplied
+}
+
+function applyAssetFormTarget(
+  row: ProductionBoardRow,
+  outputKind: QuickActionOutputKind,
+) {
+  const promptRunApplied = setPromptRunForShot(row, outputKind)
+  const assetType = outputKind === 'video' ? 'video' : 'shot_image'
+
+  setSelectValueByLabel('Asset Type', assetType)
+  setSelectValueByLabel('Related Entity Type', 'shot')
+  setInputValueByLabel('Related Entity ID', row.id)
+
+  return promptRunApplied
+}
+
+function setPromptRunForShot(row: ProductionBoardRow, outputKind: QuickActionOutputKind) {
+  const promptRunSelect = findSelectByLabel('Prompt Run')
+  if (!promptRunSelect) return false
+
+  const expectedOutputLabel = outputKind === 'video' ? 'video prompt' : 'image prompt'
+  const option = Array.from(promptRunSelect.options)
+    .reverse()
+    .find((candidateOption) => {
+      const label = candidateOption.textContent?.toLowerCase() ?? ''
+
+      return (
+        label.includes(`shot #${row.shot_order}`.toLowerCase()) &&
+        label.includes(row.title.toLowerCase()) &&
+        label.includes(expectedOutputLabel)
+      )
+    })
+
+  if (!option) return false
+
+  setSelectValue(promptRunSelect, option.value)
+  return true
+}
+
+function setSelectValueByLabel(labelText: string, value: string) {
+  const select = findSelectByLabel(labelText)
+  if (!select) return false
+
+  const optionExists = Array.from(select.options).some((option) => option.value === value)
+  if (!optionExists) return false
+
+  setSelectValue(select, value)
+  return true
+}
+
+function setSelectOptionByLabelText(labelText: string, optionTextKeyword: string) {
+  if (optionTextKeyword === 'none') return true
+
+  const select = findSelectByLabel(labelText)
+  if (!select) return false
+
+  const option = Array.from(select.options).find((candidateOption) =>
+    candidateOption.textContent?.toLowerCase().includes(optionTextKeyword),
+  )
+
+  if (!option) return false
+
+  setSelectValue(select, option.value)
+  return true
+}
+
+function setSelectValue(select: HTMLSelectElement, value: string) {
+  if (select.value === value) return
+
+  select.value = value
+  select.dispatchEvent(new Event('change', { bubbles: true }))
+}
+
+function setInputValueByLabel(labelText: string, value: string) {
+  const input = findInputByLabel(labelText)
+  if (!input) return false
+
+  const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+    window.HTMLInputElement.prototype,
+    'value',
+  )?.set
+
+  nativeInputValueSetter?.call(input, value)
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  return true
+}
+
+function findSelectByLabel(labelText: string) {
+  return findLabel(labelText)?.querySelector('select') ?? null
+}
+
+function findInputByLabel(labelText: string) {
+  return findLabel(labelText)?.querySelector('input') ?? null
+}
+
+function findLabel(labelText: string) {
+  return Array.from(document.querySelectorAll('label')).find((label) =>
+    label.textContent?.includes(labelText),
+  ) ?? null
 }
 
 function showQuickActionBanner(
