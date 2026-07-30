@@ -5,6 +5,7 @@ import { CharacterCard } from './components/characters/CharacterCard'
 import { CharacterDetailPanel } from './components/characters/CharacterDetailPanel'
 import { FactionCard } from './components/factions/FactionCard'
 import { LocationCard } from './components/locations/LocationCard'
+import { ProductionBoardPanel } from './components/production/ProductionBoardPanel'
 import { ProjectCard } from './components/projects/ProjectCard'
 import { PromptBuilderPanel } from './components/promptBuilder/PromptBuilderPanel'
 import { PromptRunCard } from './components/promptRuns/PromptRunCard'
@@ -31,6 +32,10 @@ import {
   getLocationsByProject,
   type LocationWithWorldview,
 } from './services/locationService'
+import {
+  getProductionBoardRows,
+  type ProductionBoardRow,
+} from './services/productionBoardService'
 import {
   getProjects,
   type Project,
@@ -76,6 +81,7 @@ function App() {
   const [promptRuns, setPromptRuns] = useState<PromptRunWithDetails[]>([])
   const [assets, setAssets] = useState<AssetWithPromptRun[]>([])
   const [styleGuides, setStyleGuides] = useState<StyleGuide[]>([])
+  const [productionBoardRows, setProductionBoardRows] = useState<ProductionBoardRow[]>([])
   const [selectedCharacter, setSelectedCharacter] =
     useState<CharacterWithWorldview | null>(null)
 
@@ -90,6 +96,7 @@ function App() {
   const [isLoadingPromptRuns, setIsLoadingPromptRuns] = useState(true)
   const [isLoadingAssets, setIsLoadingAssets] = useState(true)
   const [isLoadingStyleGuides, setIsLoadingStyleGuides] = useState(true)
+  const [isLoadingProductionBoard, setIsLoadingProductionBoard] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const loadScenes = useCallback(() => {
@@ -116,10 +123,24 @@ function App() {
       .finally(() => setIsLoadingAssets(false))
   }, [])
 
+  const loadProductionBoard = useCallback(() => {
+    setIsLoadingProductionBoard(true)
+    getProductionBoardRows(ETERNAL_RIFT_PROJECT_ID)
+      .then((data) => setProductionBoardRows(data))
+      .catch((error) => setErrorMessage(error.message))
+      .finally(() => setIsLoadingProductionBoard(false))
+  }, [])
+
   const refreshPromptRunDependentData = useCallback(() => {
     loadPromptRuns()
     loadAssets()
-  }, [loadAssets, loadPromptRuns])
+    loadProductionBoard()
+  }, [loadAssets, loadProductionBoard, loadPromptRuns])
+
+  const refreshAssetDependentData = useCallback(() => {
+    loadAssets()
+    loadProductionBoard()
+  }, [loadAssets, loadProductionBoard])
 
   useEffect(() => {
     getProjects()
@@ -164,12 +185,13 @@ function App() {
 
     loadPromptRuns()
     loadAssets()
+    loadProductionBoard()
 
     getStyleGuidesByProject(ETERNAL_RIFT_PROJECT_ID)
       .then((data) => setStyleGuides(data))
       .catch((error) => setErrorMessage(error.message))
       .finally(() => setIsLoadingStyleGuides(false))
-  }, [loadAssets, loadPromptRuns, loadScenes])
+  }, [loadAssets, loadProductionBoard, loadPromptRuns, loadScenes])
 
   return (
     <AppLayout
@@ -198,6 +220,7 @@ function App() {
           promptRuns={promptRuns}
           assets={assets}
           styleGuides={styleGuides}
+          productionBoardRows={productionBoardRows}
           isLoadingProjects={isLoadingProjects}
           errorMessage={errorMessage}
         />
@@ -237,7 +260,19 @@ function App() {
           locations={locations}
           isLoadingScenes={isLoadingScenes}
           errorMessage={errorMessage}
-          onSceneCreated={loadScenes}
+          onSceneCreated={() => {
+            loadScenes()
+            loadProductionBoard()
+          }}
+        />
+      )}
+
+      {activeSection === 'productionBoard' && (
+        <ProductionBoardPanel
+          rows={productionBoardRows}
+          isLoading={isLoadingProductionBoard}
+          errorMessage={errorMessage}
+          onRefresh={loadProductionBoard}
         />
       )}
 
@@ -265,7 +300,7 @@ function App() {
           promptTemplates={promptTemplates}
           styleGuides={styleGuides}
           isLoadingStyleGuides={isLoadingStyleGuides}
-          onPromptRunCreated={loadPromptRuns}
+          onPromptRunCreated={refreshPromptRunDependentData}
         />
       )}
 
@@ -275,7 +310,7 @@ function App() {
           assets={assets}
           isLoadingPromptRuns={isLoadingPromptRuns}
           errorMessage={errorMessage}
-          onAssetStatusChanged={loadAssets}
+          onAssetStatusChanged={refreshAssetDependentData}
           onPromptRunDeleted={refreshPromptRunDependentData}
         />
       )}
@@ -287,8 +322,8 @@ function App() {
           promptRuns={promptRuns}
           isLoadingAssets={isLoadingAssets}
           errorMessage={errorMessage}
-          onAssetCreated={loadAssets}
-          onAssetChanged={loadAssets}
+          onAssetCreated={refreshAssetDependentData}
+          onAssetChanged={refreshAssetDependentData}
         />
       )}
 
@@ -314,6 +349,7 @@ function PageIntro({ activeSection }: PageIntroProps) {
     worldviews: 'Worldviews',
     locations: 'Locations',
     scenes: 'Scenes',
+    productionBoard: 'Production Board',
     factions: 'Factions',
     relationships: 'Relationships',
     promptBuilder: 'Prompt Builder',
@@ -328,6 +364,7 @@ function PageIntro({ activeSection }: PageIntroProps) {
     worldviews: 'Eternal Rift 세계관 규칙, 문명 수준, 시각 톤, 프롬프트 요약을 확인합니다.',
     locations: 'Eternal Rift 장소와 배경 프롬프트 데이터를 확인합니다.',
     scenes: 'Eternal Rift 장면 구성, 연출 정보, 대표 씬 이미지를 생성/관리합니다.',
+    productionBoard: 'Scene/Shot 제작 진행률, 승인 이미지, 승인 영상, 다음 액션을 한눈에 확인합니다.',
     factions: 'Eternal Rift 세력, 조직, 문명 정보를 확인합니다.',
     relationships: 'Eternal Rift 캐릭터 간 관계, 감정선, 갈등 구조를 확인합니다.',
     promptBuilder: '캐릭터/장소/장면 데이터, 스타일 가이드, 프롬프트 템플릿을 조합해 Google Flow용 최종 프롬프트를 생성하고 실행 기록으로 저장합니다.',
@@ -363,6 +400,7 @@ type OverviewSectionProps = {
   promptRuns: PromptRunWithDetails[]
   assets: AssetWithPromptRun[]
   styleGuides: StyleGuide[]
+  productionBoardRows: ProductionBoardRow[]
   isLoadingProjects: boolean
   errorMessage: string | null
 }
@@ -379,23 +417,29 @@ function OverviewSection({
   promptRuns,
   assets,
   styleGuides,
+  productionBoardRows,
   isLoadingProjects,
   errorMessage,
 }: OverviewSectionProps) {
+  const approvedVideoCount = productionBoardRows.filter(
+    (row) => row.hasApprovedVideo,
+  ).length
+
   return (
     <>
-      <section className="overview-summary-grid mt-8 grid gap-4 md:grid-cols-4 xl:grid-cols-11">
+      <section className="overview-summary-grid mt-8 grid gap-4 md:grid-cols-4 xl:grid-cols-12">
         <SummaryCard label="Projects" value={projects.length} />
         <SummaryCard label="Characters" value={characters.length} />
         <SummaryCard label="Worldviews" value={worldviews.length} />
         <SummaryCard label="Locations" value={locations.length} />
         <SummaryCard label="Scenes" value={scenes.length} />
+        <SummaryCard label="Shots" value={productionBoardRows.length} />
+        <SummaryCard label="Videos" value={approvedVideoCount} />
         <SummaryCard label="Factions" value={factions.length} />
         <SummaryCard label="Relations" value={relationships.length} />
         <SummaryCard label="Templates" value={promptTemplates.length} />
         <SummaryCard label="Runs" value={promptRuns.length} />
-        <SummaryCard label="Assets" value={assets.length} />
-        <SummaryCard label="Styles" value={styleGuides.length} />
+        <SummaryCard label="Assets" value={assets.length || styleGuides.length} />
       </section>
 
       <section className="mt-8">
